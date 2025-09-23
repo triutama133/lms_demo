@@ -53,7 +53,8 @@ export default function EditMaterial() {
     setLoading(true);
     setError('');
     try {
-      let res, data;
+  let res;
+  const data = undefined;
       if (material?.type === 'pdf') {
         const formData = new FormData();
         formData.append('id', materialId as string);
@@ -82,11 +83,11 @@ export default function EditMaterial() {
           })
         });
       }
-      data = await res.json();
-      if (res.ok && data.success) {
+  const responseData = await res.json();
+      if (res.ok && responseData.success) {
         router.push(`/lms/courses/${courseId}/materials`);
       } else {
-        setError(data.error || 'Gagal update materi');
+        setError(responseData.error || 'Gagal update materi');
       }
     } catch (err) {
       if (err instanceof Error) {

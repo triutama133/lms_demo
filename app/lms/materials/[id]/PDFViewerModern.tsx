@@ -2,8 +2,6 @@
 import React from "react";
 import dynamic from "next/dynamic";
 const Viewer = dynamic(() => import("@react-pdf-viewer/core").then(mod => mod.Viewer), { ssr: false });
-import { Worker } from "@react-pdf-viewer/core";
-import { pageNavigationPlugin } from "@react-pdf-viewer/page-navigation";
 import "@react-pdf-viewer/core/lib/styles/index.css";
 import "@react-pdf-viewer/page-navigation/lib/styles/index.css";
 

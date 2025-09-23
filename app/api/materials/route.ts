@@ -21,7 +21,7 @@ export async function DELETE(req: NextRequest) {
         }
         const bucket = storage.bucket(bucketName);
         await bucket.file(filePath).delete();
-      } catch (_err: unknown) {
+         } catch {
           // Jika gagal hapus file, lanjutkan hapus DB
       }
     }

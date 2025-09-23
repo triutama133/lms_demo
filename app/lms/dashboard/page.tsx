@@ -16,12 +16,6 @@ type Course = {
   title: string;
   description: string;
 };
-type Material = {
-  id: string;
-  title: string;
-  type: string;
-  course_id: string;
-};
 
 export default function StudentDashboard() {
   const [courses, setCourses] = useState<Course[]>([]);

@@ -211,7 +211,7 @@ export default function AdminDashboard() {
                           });
                           const data = await res.json();
                           if (data.success) {
-                            setUsers(prev => prev.map((u: any) => u.id === editUser.id ? { ...u, name: editForm.name, email: editForm.email, role: editForm.role } : u));
+                            setUsers(prev => prev.map((u: User) => u.id === editUser.id ? { ...u, name: editForm.name, email: editForm.email, role: editForm.role } : u));
                             setShowEditModal(false);
                             setEditUser(null);
                           } else {
@@ -277,7 +277,7 @@ export default function AdminDashboard() {
                             });
                             const data = await res.json();
                             if (data.success) {
-                              setUsers(prev => prev.filter((u: any) => u.id !== deleteUser.id));
+                              setUsers(prev => prev.filter((u: User) => u.id !== deleteUser.id));
                               setShowDeleteModal(false);
                               setDeleteUser(null);
                             } else {
@@ -307,7 +307,7 @@ export default function AdminDashboard() {
                       <div className="text-gray-500">Belum ada peserta yang enroll.</div>
                     ) : (
                       <ul className="mb-4">
-                        {participants.map((p) => (
+                        {participants.map((p: User) => (
                           <li key={p.id} className="mb-2">
                             <span className="font-semibold text-blue-700">{p.name}</span>
                             <span className="ml-2 text-gray-600">{p.email}</span>
