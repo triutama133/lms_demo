@@ -6,7 +6,6 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import parse from 'html-react-parser';
 
 // Komponen video embed
 function VideoEmbed({ url }: { url: string }) {

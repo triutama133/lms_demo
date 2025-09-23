@@ -5,8 +5,6 @@ import { useEffect, useState } from 'react';
 
 export default function TeacherDashboard() {
   type Course = { id: string; title: string; description: string; enrolled_count?: number };
-  type Material = { id: string; title: string; type: string };
-  type Progress = { id: string; material_id: string; status: string };
   const [courses, setCourses] = useState<Course[]>([]);
   // ...existing code...
   const [loading, setLoading] = useState(true);

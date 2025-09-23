@@ -54,7 +54,7 @@ export default function Login() {
       } else {
             setError('Gagal login');
       }
-    } catch (err) {
+    } catch {
       setError('Terjadi kesalahan.');
     }
     setLoading(false);

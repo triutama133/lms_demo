@@ -18,7 +18,7 @@ type Course = {
 };
 
 export default function StudentDashboard() {
-  const [courses, setCourses] = useState<Course[]>([]);
+  // ...existing code...
   const [enrolledCourses, setEnrolledCourses] = useState<Course[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [showMenu, setShowMenu] = useState(false);

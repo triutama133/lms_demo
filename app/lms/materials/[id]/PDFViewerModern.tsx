@@ -1,7 +1,5 @@
 "use client";
 import React from "react";
-import dynamic from "next/dynamic";
-const Viewer = dynamic(() => import("@react-pdf-viewer/core").then(mod => mod.Viewer), { ssr: false });
 import "@react-pdf-viewer/core/lib/styles/index.css";
 import "@react-pdf-viewer/page-navigation/lib/styles/index.css";
 
@@ -10,10 +8,9 @@ interface PDFViewerModernProps {
   totalPages: number;
 }
 
+import { useRouter } from 'next/navigation';
 const PDFViewerModern: React.FC<PDFViewerModernProps> = ({ pdfUrl }) => {
-  // Router for navigation
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const router = (typeof window !== 'undefined' ? require('next/navigation').useRouter() : null);
+  const router = useRouter();
 
   // Back handler
   const handleBack = () => {

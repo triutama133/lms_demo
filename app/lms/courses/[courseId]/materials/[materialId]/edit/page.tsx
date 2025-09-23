@@ -54,7 +54,6 @@ export default function EditMaterial() {
     setError('');
     try {
   let res;
-  const data = undefined;
       if (material?.type === 'pdf') {
         const formData = new FormData();
         formData.append('id', materialId as string);
