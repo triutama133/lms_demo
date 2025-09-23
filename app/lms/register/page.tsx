@@ -32,7 +32,7 @@ export default function Register() {
       } else {
         setError(data.error || 'Gagal mendaftar.');
       }
-    } catch (err) {
+    } catch {
       setError('Terjadi kesalahan.');
     }
     setLoading(false);

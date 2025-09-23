@@ -8,8 +8,7 @@ export default function TeacherDashboard() {
   type Material = { id: string; title: string; type: string };
   type Progress = { id: string; material_id: string; status: string };
   const [courses, setCourses] = useState<Course[]>([]);
-  const [materials, setMaterials] = useState<Material[]>([]);
-  const [progress, setProgress] = useState<Progress[]>([]);
+  // ...existing code...
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -31,8 +30,6 @@ export default function TeacherDashboard() {
       .then(data => {
         if (data.success) {
           setCourses(data.courses || []);
-          setMaterials(data.materials || []);
-          setProgress(data.progress || []);
         } else {
           setError(data.error || 'Gagal fetch data');
         }

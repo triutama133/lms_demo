@@ -15,7 +15,7 @@ interface PDFViewerModernProps {
 const PDFViewerModern: React.FC<PDFViewerModernProps> = ({ pdfUrl }) => {
   // Router for navigation
   // eslint-disable-next-line react-hooks/rules-of-hooks
-  const router = require('next/navigation').useRouter();
+  const router = (typeof window !== 'undefined' ? require('next/navigation').useRouter() : null);
 
   // Back handler
   const handleBack = () => {

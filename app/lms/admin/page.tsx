@@ -1,5 +1,6 @@
 "use client";
 import Link from 'next/link';
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -29,22 +30,34 @@ export default function AdminDashboard() {
     }
     router.replace('/lms/login');
   };
-  const [users, setUsers] = useState<any[]>([]);
-  const [courses, setCourses] = useState<any[]>([]);
+  interface User {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  }
+  interface Course {
+    id: string;
+    teacher_name?: string;
+    title: string;
+    enrolled_count?: number;
+  }
+  const [users, setUsers] = useState<User[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editUser, setEditUser] = useState<any>(null);
+  const [editUser, setEditUser] = useState<User | null>(null);
   const [editForm, setEditForm] = useState({ name: '', email: '', role: '', password: '' });
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteUser, setDeleteUser] = useState<any>(null);
+  const [deleteUser, setDeleteUser] = useState<User | null>(null);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
-  const [participants, setParticipants] = useState<any[]>([]);
+  const [participants, setParticipants] = useState<User[]>([]);
   const [participantsLoading, setParticipantsLoading] = useState(false);
   const [participantsError, setParticipantsError] = useState('');
-  const [selectedCourse, setSelectedCourse] = useState<any>(null);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [searchUser, setSearchUser] = useState('');
 
   useEffect(() => {
@@ -69,7 +82,7 @@ export default function AdminDashboard() {
       <header className="w-full bg-blue-700 py-4 shadow-lg mb-6">
         <div className="max-w-5xl mx-auto flex items-center justify-between px-6">
           <div className="flex items-center gap-3">
-            <img src="/ILMI logo new.png" alt="ILMI Logo" className="h-12 w-12 object-contain" />
+            <Image src="/ILMI logo new.png" alt="ILMI Logo" width={48} height={48} className="h-12 w-12 object-contain" />
             <h1 className="text-2xl font-bold text-white">LMS Admin Dashboard</h1>
           </div>
           <nav className="flex items-center gap-2">
@@ -116,7 +129,7 @@ export default function AdminDashboard() {
                     {users.filter(u =>
                       u.name.toLowerCase().includes(searchUser.toLowerCase()) ||
                       u.email.toLowerCase().includes(searchUser.toLowerCase())
-                    ).map((u: any) => (
+                    ).map((u) => (
                       <tr key={u.id} className="hover:bg-blue-50 transition">
                         <td className="px-4 py-2 border-b">{u.name}</td>
                         <td className="px-4 py-2 border-b">{u.email}</td>
@@ -143,7 +156,7 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {courses.map((c: any) => (
+                    {courses.map((c) => (
                       <tr key={c.id} className="hover:bg-purple-50 transition">
                         <td className="px-4 py-2 border-b">{c.teacher_name || '-'}</td>
                         <td className="px-4 py-2 border-b">{c.title}</td>
@@ -167,7 +180,7 @@ export default function AdminDashboard() {
                             }
                             setParticipantsLoading(false);
                           }}>Lihat Peserta</button>
-                          <a href={`/lms/courses/${c.id}/materials`} className="bg-purple-600 hover:bg-purple-700 text-white rounded px-3 py-1 font-semibold text-sm shadow">Lihat Materi</a>
+                          <Link href={`/lms/courses/${c.id}/materials`} className="bg-purple-600 hover:bg-purple-700 text-white rounded px-3 py-1 font-semibold text-sm shadow">Lihat Materi</Link>
                         </td>
                       </tr>
                     ))}
@@ -294,7 +307,7 @@ export default function AdminDashboard() {
                       <div className="text-gray-500">Belum ada peserta yang enroll.</div>
                     ) : (
                       <ul className="mb-4">
-                        {participants.map((p: any) => (
+                        {participants.map((p) => (
                           <li key={p.id} className="mb-2">
                             <span className="font-semibold text-blue-700">{p.name}</span>
                             <span className="ml-2 text-gray-600">{p.email}</span>

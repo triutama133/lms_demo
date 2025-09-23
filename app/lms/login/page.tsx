@@ -52,7 +52,7 @@ export default function Login() {
           }
         }
       } else {
-        setError(data.error || 'Email atau password salah.');
+            setError('Gagal login');
       }
     } catch (err) {
       setError('Terjadi kesalahan.');

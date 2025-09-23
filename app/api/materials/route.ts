@@ -13,7 +13,7 @@ export async function DELETE(req: NextRequest) {
     // (Opsional) Hapus file PDF di GCS jika tipe pdf dan ada pdf_url
     if (material.type === 'pdf' && material.pdf_url && storage) {
       try {
-        // Ekstrak path file dari url
+          // Ekstrak path file dari url
         const urlParts = material.pdf_url.split('/');
         const filePath = urlParts.slice(4).join('/');
         if (!bucketName) {
@@ -22,7 +22,7 @@ export async function DELETE(req: NextRequest) {
         const bucket = storage.bucket(bucketName);
         await bucket.file(filePath).delete();
       } catch (_err: unknown) {
-        // Jika gagal hapus file, lanjutkan hapus DB
+          // Jika gagal hapus file, lanjutkan hapus DB
       }
     }
     // Hapus dari DB

@@ -88,8 +88,12 @@ export default function EditMaterial() {
       } else {
         setError(data.error || 'Gagal update materi');
       }
-    } catch (err: any) {
-      setError(err.message || 'Gagal update materi');
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message || 'Gagal update materi');
+      } else {
+        setError('Gagal update materi');
+      }
     }
     setLoading(false);
   };

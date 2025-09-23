@@ -21,7 +21,7 @@ export default function MaterialView() {
       .then(res => res.json())
       .then(data => {
         if (data.success) {
-          let materialData = { ...data.material };
+          const materialData = { ...data.material };
           if (typeof materialData.sections === 'string') {
             try {
               materialData.sections = JSON.parse(materialData.sections);

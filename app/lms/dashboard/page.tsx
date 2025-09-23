@@ -26,8 +26,6 @@ type Material = {
 export default function StudentDashboard() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [enrolledCourses, setEnrolledCourses] = useState<Course[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [user, setUser] = useState<User | null>(null);
   const [showMenu, setShowMenu] = useState(false);
   const greetings = [
@@ -67,20 +65,6 @@ export default function StudentDashboard() {
     const userObj = JSON.parse(userData);
     setUser(userObj);
     // Fetch semua courses (jika ingin tampilkan semua)
-    fetch('/api/courses')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setCourses(data.courses || []);
-        } else {
-          setError(data.error || 'Gagal fetch data');
-        }
-        setLoading(false);
-      })
-      .catch(() => {
-        setError('Gagal fetch data');
-        setLoading(false);
-      });
     // Fetch enrolled courses
     fetch(`/api/enroll?user_id=${userObj.id}`)
       .then(res => res.json())
