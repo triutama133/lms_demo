@@ -6,7 +6,6 @@ function DummyHeader() {
       <div className="flex items-center gap-3">
   <img src="/ILMI logo new.png" alt="ILMI Logo" className="h-12 w-12 object-contain" />
   <span className="text-2xl font-bold text-blue-700">LMS</span>
-        <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full ml-2">MVP</span>
       </div>
       <nav className="flex gap-6">
         <Link href="/lms/home" className="text-blue-700 hover:underline font-medium">Home</Link>
@@ -58,7 +57,7 @@ export default function Home() {
           <div>
             <h2 className="text-base font-semibold text-blue-700 mb-0.5">Tentang LMS Demo</h2>
             <p className="text-gray-700 mb-0.5">
-              LMS Demo adalah platform pembelajaran modern untuk pengembangan soft skill dan karir profesional. Versi MVP — fitur utama: materi, mentoring, tracking progress.
+              LMS Demo adalah platform pembelajaran modern untuk pengembangan soft skill dan karir profesional. Versi MVP — fitur utama: akses materi.
             </p>
           </div>
           <div className="text-gray-600 mt-1 md:mt-0">
