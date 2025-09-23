@@ -8,7 +8,9 @@ import VideoEmbed from '../../../../../../components/VideoEmbed';
 
 export default function MaterialView() {
   const { courseId, materialId } = useParams();
-  const [material, setMaterial] = useState<any>(null);
+  type Section = { id?: string; title: string; content: string; order?: number };
+  type Material = { id: string; title: string; description?: string; type: string; video_url?: string; pdf_url?: string; sections: Section[] };
+  const [material, setMaterial] = useState<Material | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [openSection, setOpenSection] = useState<number | null>(null);

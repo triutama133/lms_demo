@@ -21,7 +21,8 @@ export async function GET(request: Request) {
   }
 
   // Ambil data user dari user_id hasil enrollments
-  const userIds = enrollments.map((e: any) => e.user_id);
+  type Enrollment = { user_id: string };
+  const userIds = (enrollments as Enrollment[]).map((e) => e.user_id);
   const { data: users, error: userError } = await supabase
     .from('users')
     .select('id, name, email')

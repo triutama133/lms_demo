@@ -6,8 +6,10 @@ import { useParams } from 'next/navigation';
 export default function CourseDetailPage() {
   const [progressPercent, setProgressPercent] = useState<number | null>(null);
   const { courseId } = useParams();
-  const [course, setCourse] = useState<any>(null);
-  const [materials, setMaterials] = useState<any[]>([]);
+  type Material = { id: string; title: string };
+  type Course = { id: string; title: string; description: string };
+  const [course, setCourse] = useState<Course | null>(null);
+  const [materials, setMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [enrolled, setEnrolled] = useState(false);
@@ -45,7 +47,7 @@ export default function CourseDetailPage() {
         .then(res => res.json())
         .then(data => {
           if (data.success && Array.isArray(data.courses)) {
-            const enrolledCourseIds = data.courses.map((c: any) => c.id);
+            const enrolledCourseIds = data.courses.map((c: Course) => c.id);
             setEnrolled(enrolledCourseIds.includes(courseId));
           }
         });
@@ -70,7 +72,7 @@ export default function CourseDetailPage() {
           .then(res => res.json())
           .then(data => {
             if (data.success && Array.isArray(data.progress)) {
-              const completed = data.progress.filter((p: any) => p.status === 'completed').length;
+              const completed = data.progress.filter((p: { status: string }) => p.status === 'completed').length;
               const total = data.progress.length;
               setProgressPercent(total > 0 ? Math.round((completed / total) * 100) : 0);
             }

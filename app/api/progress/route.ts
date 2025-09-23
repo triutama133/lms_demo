@@ -25,7 +25,10 @@ export async function GET(req: Request) {
   }
 
   // Filter hanya progress yang materialnya ada di course yang dimaksud
-  const progress = (data || []).filter((p: any) => p.materials && p.materials.course_id === course_id);
+  const progress = (data || []).filter((p) =>
+    Array.isArray(p.materials) &&
+    p.materials.some((m) => m.course_id === course_id)
+  );
 
   return NextResponse.json({ success: true, progress });
 }

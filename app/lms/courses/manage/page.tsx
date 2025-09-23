@@ -4,23 +4,25 @@ import TeacherHeader from '../../../components/TeacherHeader';
 import { useEffect, useState } from 'react';
 
 export default function ManageCourses() {
-  const [courses, setCourses] = useState<any[]>([]);
+  type Course = { id: string; title: string; description: string; enrolled_count?: number };
+  type Participant = { id: string; name: string; email: string };
+  const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [courseToDelete, setCourseToDelete] = useState<any>(null);
+  const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [courseToEdit, setCourseToEdit] = useState<any>(null);
+  const [courseToEdit, setCourseToEdit] = useState<Course | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState('');
 
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
-  const [participants, setParticipants] = useState<any[]>([]);
+  const [participants, setParticipants] = useState<Participant[]>([]);
   const [participantsLoading, setParticipantsLoading] = useState(false);
   const [participantsError, setParticipantsError] = useState('');
-  const [selectedCourse, setSelectedCourse] = useState<any>(null);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
 
   useEffect(() => {
     const userData = typeof window !== 'undefined' ? localStorage.getItem('lms_user') : null;
@@ -69,7 +71,7 @@ export default function ManageCourses() {
               {courses.length === 0 ? (
                 <div className="text-gray-500">Belum ada course.</div>
               ) : (
-                courses.map((c: any) => (
+                courses.map((c: Course) => (
                   <li key={c.id} className="mb-4">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                       <div>

@@ -55,7 +55,7 @@ export async function PUT(req: NextRequest) {
     if (!id || !title) {
       return NextResponse.json({ success: false, error: 'ID dan judul wajib diisi.' }, { status: 400 });
     }
-    let updateData: any = { title, description };
+  let updateData: Record<string, unknown> = { title, description };
     // Jika ada file PDF baru, upload dan replace
     if (pdfFile) {
       if (!storage) {
@@ -159,7 +159,8 @@ export async function POST(req: NextRequest) {
       }
       const material = insertResult.data[0];
       // Insert sections ke table material_sections
-      let sectionsArr: any[] = [];
+  type Section = { title: string; content: string; order: number };
+  let sectionsArr: Section[] = [];
       try {
         sectionsArr = typeof sections === 'string' ? JSON.parse(sections) : sections;
       } catch {
@@ -167,7 +168,7 @@ export async function POST(req: NextRequest) {
       }
       console.log('[DEBUG] Insert section:', { materialId: material?.id, sectionsArr });
       if (material && material.id && Array.isArray(sectionsArr) && sectionsArr.length > 0) {
-        const sectionRows = sectionsArr.map((section: any, idx: number) => ({
+  const sectionRows = sectionsArr.map((section, idx) => ({
           material_id: material.id,
           title: section.title,
           content: section.content,

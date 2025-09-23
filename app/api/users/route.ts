@@ -19,7 +19,7 @@ export async function PUT(request: Request) {
   if (!id || !name || !email || !role) {
     return NextResponse.json({ success: false, error: 'Semua field wajib diisi.' }, { status: 400 });
   }
-  let updateData: any = { name, email, role };
+  let updateData: Record<string, unknown> = { name, email, role };
   if (password) {
     const hashed = await bcrypt.hash(password, 10);
     updateData.password = hashed;

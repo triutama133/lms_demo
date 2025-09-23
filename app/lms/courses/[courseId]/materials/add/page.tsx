@@ -43,8 +43,12 @@ export default function AddMaterial() {
         } else {
           setError(data.error || 'Gagal menambah materi');
         }
-      } catch (err: any) {
-        setError(err.message || 'Gagal menambah materi');
+      } catch (err) {
+        if (err instanceof Error) {
+          setError(err.message || 'Gagal menambah materi');
+        } else {
+          setError('Gagal menambah materi');
+        }
       }
       setLoading(false);
       return;
@@ -73,8 +77,12 @@ export default function AddMaterial() {
         } else {
           setError(data.error || 'Gagal menambah materi');
         }
-      } catch (err: any) {
-        setError(err.message || 'Gagal menambah materi');
+      } catch (err) {
+        if (err instanceof Error) {
+          setError(err.message || 'Gagal menambah materi');
+        } else {
+          setError('Gagal menambah materi');
+        }
       }
       setLoading(false);
     }

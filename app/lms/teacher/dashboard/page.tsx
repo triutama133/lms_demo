@@ -4,9 +4,12 @@ import TeacherHeader from '../../../components/TeacherHeader';
 import { useEffect, useState } from 'react';
 
 export default function TeacherDashboard() {
-  const [courses, setCourses] = useState([]);
-  const [materials, setMaterials] = useState([]);
-  const [progress, setProgress] = useState([]);
+  type Course = { id: string; title: string; description: string; enrolled_count?: number };
+  type Material = { id: string; title: string; type: string };
+  type Progress = { id: string; material_id: string; status: string };
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [progress, setProgress] = useState<Progress[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -67,7 +70,7 @@ export default function TeacherDashboard() {
                 <div className="text-gray-500">Belum ada course.</div>
               ) : (
                 <ul className="list-disc pl-6">
-                  {courses.map((c: any) => (
+                  {courses.map((c: Course) => (
                     <li key={c.id} className="mb-4">
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                         <div>

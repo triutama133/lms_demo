@@ -6,10 +6,12 @@ import { useParams } from 'next/navigation';
 
 export default function CourseMaterials() {
   const { courseId } = useParams();
-  const [materials, setMaterials] = useState<any[]>([]);
+  type Material = { id: string; title: string; type: string };
+  type Course = { id: string; title: string; description: string };
+  const [materials, setMaterials] = useState<Material[]>([]);
   const [showModal, setShowModal] = useState(false);
-  const [selectedMaterial, setSelectedMaterial] = useState<any>(null);
-  const [course, setCourse] = useState<any>(null);
+  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
+  const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -55,7 +57,7 @@ export default function CourseMaterials() {
             {materials.length === 0 ? (
               <div className="text-gray-500">Belum ada materi.</div>
             ) : (
-              materials.map((m: any) => (
+              materials.map((m: Material) => (
                 <li key={m.id} className="mb-4">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                     <div>

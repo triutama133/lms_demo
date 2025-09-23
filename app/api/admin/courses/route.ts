@@ -11,7 +11,10 @@ export async function GET() {
   }
 
   // Ambil semua teacher
-  const teacherIds = [...new Set(courses.map((c: any) => c.teacher_id))];
+  type Course = { id: string; title: string; description: string; teacher_id: string };
+  type Teacher = { id: string; name: string };
+  type Enrollment = { course_id: string; user_id: string };
+  const teacherIds = [...new Set((courses as Course[]).map((c) => c.teacher_id))];
   const { data: teachers, error: teacherError } = await supabase
     .from('users')
     .select('id, name')
@@ -21,7 +24,7 @@ export async function GET() {
   }
 
   // Ambil jumlah peserta per course
-  const courseIds = courses.map((c: any) => c.id);
+  const courseIds = (courses as Course[]).map((c) => c.id);
   const { data: enrollments, error: enrollError } = await supabase
     .from('enrollments')
     .select('course_id, user_id');
@@ -30,13 +33,13 @@ export async function GET() {
   }
 
   // Map teacher name dan jumlah peserta ke course
-  const teacherMap = Object.fromEntries(teachers.map((t: any) => [t.id, t.name]));
+  const teacherMap = Object.fromEntries((teachers as Teacher[]).map((t) => [t.id, t.name]));
   const enrolledMap: Record<string, number> = {};
   for (const cId of courseIds) {
-    enrolledMap[cId] = enrollments.filter((e: any) => e.course_id === cId).length;
+    enrolledMap[cId] = (enrollments as Enrollment[]).filter((e) => e.course_id === cId).length;
   }
 
-  const result = courses.map((c: any) => ({
+  const result = (courses as Course[]).map((c) => ({
     ...c,
     teacher_name: teacherMap[c.teacher_id] || '-',
     enrolled_count: enrolledMap[c.id] || 0,

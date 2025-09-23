@@ -19,7 +19,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ success: false, error: 'Materi tidak ditemukan' });
   }
 
-  let sections: any[] = [];
+  type Section = { title: string; content: string; order: number };
+  let sections: Section[] = [];
   if (data.type === 'markdown') {
     const { data: sectionData, error: sectionError } = await supabase
       .from('material_sections')

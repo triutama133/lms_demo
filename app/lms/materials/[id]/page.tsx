@@ -52,11 +52,13 @@ function autoLinkVideo(text: string): string {
 
 export default function MaterialDetailPage() {
   const { id } = useParams();
-  const [material, setMaterial] = useState<any>(null);
+  type Section = { title: string; content: string; order: number };
+  type Material = { id: string; title: string; description: string; type: string; pdf_url?: string; content?: string; sections: Section[] };
+  const [material, setMaterial] = useState<Material | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [progressUpdated, setProgressUpdated] = useState(false);
-  const [sections, setSections] = useState<any[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
   const [openSections, setOpenSections] = useState<boolean[]>([]);
   const router = useRouter();
 
@@ -75,7 +77,7 @@ export default function MaterialDetailPage() {
           }
           setMaterial(materialData);
           setSections(Array.isArray(materialData.sections) ? materialData.sections : []);
-          setOpenSections(Array.isArray(materialData.sections) ? materialData.sections.map((_: any, idx: number) => idx === 0) : []);
+          setOpenSections(Array.isArray(materialData.sections) ? materialData.sections.map((_: Section, idx: number) => idx === 0) : []);
           // Update progress
           const user_id = localStorage.getItem('user_id');
           if (user_id && !progressUpdated) {
@@ -118,7 +120,7 @@ export default function MaterialDetailPage() {
           <div>
             {sections.length > 0 ? (
               <div className="space-y-4">
-                {sections.map((section: any, idx: number) => (
+                {sections.map((section: Section, idx: number) => (
                   <div key={idx} className="rounded-2xl shadow-lg border border-purple-200 bg-white">
                     <button
                       type="button"
@@ -142,14 +144,14 @@ export default function MaterialDetailPage() {
                               const { domToReact } = require('html-react-parser');
                               const htmlParser = require('htmlparser2');
                               const dom = htmlParser.parseDocument(section.content).children;
-                              let result: any[] = [];
+                              let result: React.ReactNode[] = [];
                               dom.forEach((node: any, idx: number) => {
                                 if (node.name === 'p' && (!node.children || node.children.length === 0)) {
                                   result.push(<br key={`br-main-${idx}`} />);
                                 } else if (node.name === 'p') {
                                   // Proses isi <p> seperti sebelumnya
                                   const videoRegex = /(https?:\/\/(www\.)?(youtube\.com|youtu\.be|vimeo\.com)\/[\w\-\?=&#%\.\/]+)/g;
-                                  let nodes: any[] = [];
+                                  let nodes: React.ReactNode[] = [];
                                   node.children.forEach((child: any, cidx: number) => {
                                     if (child.type === 'text' && typeof child.data === 'string') {
                                       let lastIndex = 0;

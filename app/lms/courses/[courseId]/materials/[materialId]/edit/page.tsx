@@ -10,7 +10,9 @@ const SectionEditor = dynamic<{
 export default function EditMaterial() {
   const { courseId, materialId } = useParams();
   const router = useRouter();
-  const [material, setMaterial] = useState<any>(null);
+  type Material = { id: string; title: string; description?: string; type: string; pdf_url?: string; sections?: Section[] };
+  type Section = { id?: string; title: string; content: string; order?: number };
+  const [material, setMaterial] = useState<Material | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
@@ -28,7 +30,7 @@ export default function EditMaterial() {
           setTitle(data.material.title);
           setDescription(data.material.description || '');
           if (Array.isArray(data.material.sections)) {
-            setSections(data.material.sections.map((s: any, idx: number) => ({
+            setSections(data.material.sections.map((s: Section, idx: number) => ({
               id: s.id,
               title: s.title,
               content: s.content,

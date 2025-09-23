@@ -13,7 +13,8 @@ export async function GET(request: Request) {
   if (enrollError) {
     return NextResponse.json({ success: false, error: enrollError.message });
   }
-  const courseIds = enrollments.map((e: any) => e.course_id);
+  type Enrollment = { course_id: string };
+  const courseIds = (enrollments as Enrollment[]).map((e) => e.course_id);
   if (!courseIds.length) {
     return NextResponse.json({ success: true, courses: [] });
   }
