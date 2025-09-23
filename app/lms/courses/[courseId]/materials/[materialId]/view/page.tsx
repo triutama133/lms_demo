@@ -102,65 +102,25 @@ export default function MaterialView() {
                     </button>
                     {openSection === idx && (
                       <div className="px-6 pb-6 pt-2 prose prose-lg max-w-none text-gray-800 animate-fadein" style={{marginBottom: '0.5em'}}>
-                        {section.content && /<\/?[a-z][\s\S]*>/i.test(section.content)
-                          ? parse(section.content, {
-                              replace: (domNode: unknown) => {
-                                // Type guard for domNode
-                                if (typeof domNode !== 'object' || domNode === null) return undefined;
-                                const node = domNode as { name?: string; children?: any[]; attribs?: Record<string, string> };
-                                // If <p> contains a video link, split into fragment
-                                if (node.name === 'p' && node.children) {
-                                  const videoLinkIdx = node.children.findIndex(
-                                    (child: unknown) => typeof child === 'object' && child !== null && (child as any).name === 'a' && (child as any).attribs?.href && /youtu\.be|youtube\.com|vimeo\.com/.test((child as any).attribs.href)
-                                  );
-                                  if (videoLinkIdx !== -1) {
-                                    const before = node.children.slice(0, videoLinkIdx);
-                                    const videoChild = node.children[videoLinkIdx];
-                                    const after = node.children.slice(videoLinkIdx + 1);
-                                    return <>
-                                      {before.length > 0 && <p>{domToReact(before)}</p>}
-                                      <VideoEmbed url={(videoChild as any).attribs.href} />
-                                      {after.length > 0 && <p>{domToReact(after)}</p>}
-                                    </>;
-                                  }
-                                }
-                                // Render VideoEmbed jika <a> mengandung link video
-                                if (node.name === 'a' && node.attribs?.href && /youtu\.be|youtube\.com|vimeo\.com/.test(node.attribs.href)) {
-                                  return <VideoEmbed url={node.attribs.href} />;
-                                }
-                                // Jangan render <a> kosong
-                                if (node.name === 'a' && !node.attribs?.href) {
-                                  return null;
-                                }
-                                // Render <p> kosong sebagai <br /> agar baris kosong tetap muncul
-                                if (node.name === 'p' && (!node.children || node.children.length === 0)) {
-                                  return <br />;
-                                }
-                                return undefined;
+                        <ReactMarkdown
+                          components={{
+                            a: ({ href }) => {
+                              if (typeof href === 'string' && (/youtu\.be|youtube\.com|vimeo\.com/.test(href))) {
+                                return <VideoEmbed url={href} />;
                               }
-                            })
-                          : (
-                            <ReactMarkdown
-                              components={{
-                                a: ({ href }) => {
-                                  if (typeof href === 'string' && (/youtu\.be|youtube\.com|vimeo\.com/.test(href))) {
-                                    return <VideoEmbed url={href} />;
-                                  }
-                                  return <a href={href} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">{href}</a>;
-                                },
-                                p: ({ children }) => {
-                                  // Jika ada VideoEmbed di children, pecah <p> jadi fragment agar <div> tidak jadi child <p>
-                                  const hasVideo = Array.isArray(children) && children.some(
-                                    (child) => typeof child === 'object' && child?.type === VideoEmbed
-                                  );
-                                  if (hasVideo) {
-                                    return <>{children}</>;
-                                  }
-                                  return <p>{children}</p>;
-                                },
-                              }}
-                            >{section.content || ''}</ReactMarkdown>
-                          )}
+                              return <a href={href} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">{href}</a>;
+                            },
+                            p: ({ children }) => {
+                              const hasVideo = Array.isArray(children) && children.some(
+                                (child) => typeof child === 'object' && child?.type === VideoEmbed
+                              );
+                              if (hasVideo) {
+                                return <>{children}</>;
+                              }
+                              return <p>{children}</p>;
+                            },
+                          }}
+                        >{section.content || ''}</ReactMarkdown>
                       </div>
                     )}
                   </div>
