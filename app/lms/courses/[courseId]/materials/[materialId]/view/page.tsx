@@ -90,7 +90,7 @@ export default function MaterialView() {
           <div className="w-full">
             {sections.length > 0 ? (
               <div className="space-y-4">
-                {sections.map((section: any, idx: number) => (
+                {sections.map((section: Section, idx: number) => (
                   <div key={idx} className="border rounded-xl shadow bg-white/95">
                     <button
                       className={`w-full text-left px-6 py-4 flex items-center justify-between font-bold text-lg text-purple-700 hover:bg-purple-50 rounded-xl transition-all ${openSection === idx ? 'bg-purple-100' : ''}`}
@@ -104,33 +104,36 @@ export default function MaterialView() {
                       <div className="px-6 pb-6 pt-2 prose prose-lg max-w-none text-gray-800 animate-fadein" style={{marginBottom: '0.5em'}}>
                         {section.content && /<\/?[a-z][\s\S]*>/i.test(section.content)
                           ? parse(section.content, {
-                              replace: (domNode: any) => {
+                              replace: (domNode: unknown) => {
+                                // Type guard for domNode
+                                if (typeof domNode !== 'object' || domNode === null) return undefined;
+                                const node = domNode as { name?: string; children?: any[]; attribs?: Record<string, string> };
                                 // If <p> contains a video link, split into fragment
-                                if (domNode.name === 'p' && domNode.children) {
-                                  const videoLinkIdx = domNode.children.findIndex(
-                                    (child: any) => child.name === 'a' && child.attribs?.href && /youtu\.be|youtube\.com|vimeo\.com/.test(child.attribs.href)
+                                if (node.name === 'p' && node.children) {
+                                  const videoLinkIdx = node.children.findIndex(
+                                    (child: unknown) => typeof child === 'object' && child !== null && (child as any).name === 'a' && (child as any).attribs?.href && /youtu\.be|youtube\.com|vimeo\.com/.test((child as any).attribs.href)
                                   );
                                   if (videoLinkIdx !== -1) {
-                                    const before = domNode.children.slice(0, videoLinkIdx);
-                                    const videoChild = domNode.children[videoLinkIdx];
-                                    const after = domNode.children.slice(videoLinkIdx + 1);
+                                    const before = node.children.slice(0, videoLinkIdx);
+                                    const videoChild = node.children[videoLinkIdx];
+                                    const after = node.children.slice(videoLinkIdx + 1);
                                     return <>
                                       {before.length > 0 && <p>{domToReact(before)}</p>}
-                                      <VideoEmbed url={videoChild.attribs.href} />
+                                      <VideoEmbed url={(videoChild as any).attribs.href} />
                                       {after.length > 0 && <p>{domToReact(after)}</p>}
                                     </>;
                                   }
                                 }
                                 // Render VideoEmbed jika <a> mengandung link video
-                                if (domNode.name === 'a' && domNode.attribs?.href && /youtu\.be|youtube\.com|vimeo\.com/.test(domNode.attribs.href)) {
-                                  return <VideoEmbed url={domNode.attribs.href} />;
+                                if (node.name === 'a' && node.attribs?.href && /youtu\.be|youtube\.com|vimeo\.com/.test(node.attribs.href)) {
+                                  return <VideoEmbed url={node.attribs.href} />;
                                 }
                                 // Jangan render <a> kosong
-                                if (domNode.name === 'a' && !domNode.attribs?.href) {
+                                if (node.name === 'a' && !node.attribs?.href) {
                                   return null;
                                 }
                                 // Render <p> kosong sebagai <br /> agar baris kosong tetap muncul
-                                if (domNode.name === 'p' && (!domNode.children || domNode.children.length === 0)) {
+                                if (node.name === 'p' && (!node.children || node.children.length === 0)) {
                                   return <br />;
                                 }
                                 return undefined;

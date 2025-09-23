@@ -1,10 +1,11 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 function DummyHeader() {
   return (
     <header className="w-full py-4 bg-white/80 shadow-sm flex items-center justify-between px-8 fixed top-0 left-0 z-10">
       <div className="flex items-center gap-3">
-  <img src="/ILMI logo new.png" alt="ILMI Logo" className="h-12 w-12 object-contain" />
+  <Image src="/ILMI logo new.png" alt="ILMI Logo" width={48} height={48} className="h-12 w-12 object-contain" />
   <span className="text-2xl font-bold text-blue-700">LMS</span>
       </div>
       <nav className="flex gap-6">

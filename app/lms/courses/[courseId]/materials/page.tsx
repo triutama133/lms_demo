@@ -101,14 +101,15 @@ export default function CourseMaterials() {
                       });
                       const data = await res.json();
                       if (res.ok && data.success) {
-                        setMaterials(materials.filter(mat => mat.id !== selectedMaterial.id));
+                        setMaterials(materials.filter((mat: Material) => mat.id !== selectedMaterial.id));
                         setShowModal(false);
                         setSelectedMaterial(null);
                       } else {
                         setError(data.error || 'Gagal hapus materi');
                       }
-                    } catch (err: any) {
-                      setError(err.message || 'Gagal hapus materi');
+                    } catch (err: unknown) {
+                      const errorMsg = err instanceof Error ? err.message : 'Gagal hapus materi';
+                      setError(errorMsg);
                     }
                     setLoading(false);
                   }}

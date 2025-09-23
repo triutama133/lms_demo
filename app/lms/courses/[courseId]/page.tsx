@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
@@ -101,7 +102,7 @@ export default function CourseDetailPage() {
     <>
       <header className="w-full py-4 bg-white/90 shadow flex items-center justify-between px-8 fixed top-0 left-0 z-10">
         <div className="flex items-center gap-8">
-          <img src="/ILMI logo new.png" alt="ILMI Logo" className="h-12 w-12 object-contain" />
+          <Image src="/ILMI logo new.png" alt="ILMI Logo" width={48} height={48} className="h-12 w-12 object-contain" />
           <span className="text-xl font-bold text-blue-700">LMS</span>
           <nav className="flex gap-6">
             <Link href="/lms/dashboard" className="text-blue-700 hover:underline font-medium">Home</Link>
@@ -154,7 +155,7 @@ export default function CourseDetailPage() {
                   <div className="text-gray-500">Belum ada materi tersedia.</div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {materials.map((m: any) => (
+                    {materials.map((m: Material) => (
                       <div key={m.id} className="bg-gradient-to-br from-blue-100 via-white to-purple-100 rounded-lg shadow p-6 flex flex-col justify-between">
                         <div>
                           <h3 className="text-lg font-bold text-blue-800 mb-2">{m.title}</h3>

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
 export default function TeacherHeader() {
@@ -12,7 +13,7 @@ export default function TeacherHeader() {
   return (
     <header className="w-full bg-purple-700 text-white shadow flex items-center justify-between px-6 py-3">
       <div className="flex items-center gap-3">
-        <img src="/ILMI logo new.png" alt="ILMI Logo" className="h-12 w-12 object-contain" />
+  <Image src="/ILMI logo new.png" alt="ILMI Logo" width={48} height={48} className="h-12 w-12 object-contain" />
         <span className="text-2xl font-bold text-white">LMS</span>
         <nav className="flex gap-6 items-center">
           <Link href="/lms/teacher/dashboard" className="font-bold hover:underline">Home</Link>

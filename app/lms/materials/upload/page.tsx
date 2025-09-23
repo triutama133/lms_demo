@@ -41,8 +41,9 @@ export default function UploadMaterialPage() {
       } else {
         setError(data.error || 'Gagal upload materi.');
       }
-    } catch (err: any) {
-      setError(err.message || 'Terjadi kesalahan.');
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Terjadi kesalahan.';
+      setError(errorMsg);
     }
     setLoading(false);
   };

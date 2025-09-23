@@ -22,7 +22,7 @@ export async function GET(req: Request) {
   type Section = { title: string; content: string; order: number };
   let sections: Section[] = [];
   if (data.type === 'markdown') {
-    const { data: sectionData, error: sectionError } = await supabase
+    const { data: sectionData } = await supabase
       .from('material_sections')
       .select('title, content, order')
       .eq('material_id', id)
@@ -35,7 +35,7 @@ export async function GET(req: Request) {
         if (typeof content === 'string' && content.startsWith('"') && content.endsWith('"')) {
           try {
             content = JSON.parse(content);
-          } catch (e) {
+          } catch {
             // fallback: leave as is
           }
         }

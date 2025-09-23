@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import dynamic from "next/dynamic";
 const Viewer = dynamic(() => import("@react-pdf-viewer/core").then(mod => mod.Viewer), { ssr: false });
 import { Worker } from "@react-pdf-viewer/core";
@@ -14,8 +14,8 @@ interface PDFViewerModernProps {
 
 const PDFViewerModern: React.FC<PDFViewerModernProps> = ({ pdfUrl }) => {
   // Router for navigation
-  const { useRouter } = require('next/navigation');
-  const router = useRouter();
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const router = require('next/navigation').useRouter();
 
   // Back handler
   const handleBack = () => {
@@ -60,12 +60,12 @@ const PDFViewerModern: React.FC<PDFViewerModernProps> = ({ pdfUrl }) => {
       if (iframe) {
         if (iframe.requestFullscreen) {
           iframe.requestFullscreen();
-        } else if ((iframe as any).webkitRequestFullscreen) {
-          (iframe as any).webkitRequestFullscreen();
-        } else if ((iframe as any).mozRequestFullScreen) {
-          (iframe as any).mozRequestFullScreen();
-        } else if ((iframe as any).msRequestFullscreen) {
-          (iframe as any).msRequestFullscreen();
+        } else if ((iframe as unknown as { webkitRequestFullscreen?: () => void }).webkitRequestFullscreen) {
+          (iframe as unknown as { webkitRequestFullscreen: () => void }).webkitRequestFullscreen();
+        } else if ((iframe as unknown as { mozRequestFullScreen?: () => void }).mozRequestFullScreen) {
+          (iframe as unknown as { mozRequestFullScreen: () => void }).mozRequestFullScreen();
+        } else if ((iframe as unknown as { msRequestFullscreen?: () => void }).msRequestFullscreen) {
+          (iframe as unknown as { msRequestFullscreen: () => void }).msRequestFullscreen();
         }
       }
     };

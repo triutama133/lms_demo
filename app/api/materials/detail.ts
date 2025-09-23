@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   // Jika tipe markdown, ambil sections dari table material_sections
   if (material.type === 'markdown') {
     // Urutkan berdasarkan 'order' jika ada, fallback ke 'id'
-    const { data: sections, error: sectionError } = await supabase
+    const { data: sections } = await supabase
       .from('material_sections')
       .select('title, content, order')
       .eq('material_id', material_id)

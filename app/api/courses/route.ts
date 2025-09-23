@@ -14,7 +14,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
     return NextResponse.json({ success: true, course: data[0] });
-  } catch (err) {
+  } catch {
     return NextResponse.json({ success: false, error: 'Gagal update course.' }, { status: 500 });
   }
 }
@@ -34,7 +34,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
     return NextResponse.json({ success: true });
-  } catch (err) {
+  } catch {
     return NextResponse.json({ success: false, error: 'Gagal hapus course.' }, { status: 500 });
   }
 }
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
     return NextResponse.json({ success: true, course: data[0] });
-  } catch (err) {
+  } catch {
     return NextResponse.json({ success: false, error: 'Gagal tambah course.' }, { status: 500 });
   }
 }

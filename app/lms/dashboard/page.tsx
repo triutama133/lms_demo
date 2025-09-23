@@ -1,6 +1,7 @@
 
 "use client";
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -98,12 +99,12 @@ export default function StudentDashboard() {
     <>
       <header className="w-full py-4 bg-white/90 shadow flex items-center justify-between px-8 fixed top-0 left-0 z-10">
         <div className="flex items-center gap-8">
-          <img src="/ILMI logo new.png" alt="ILMI Logo" className="h-12 w-12 object-contain" />
+          <Image src="/ILMI logo new.png" alt="ILMI Logo" width={48} height={48} className="h-12 w-12 object-contain" />
           <span className="text-xl font-bold text-blue-700">LMS</span>
           <nav className="flex gap-6">
-            <a href="/lms/dashboard" className="text-blue-700 hover:underline font-medium">Home</a>
-            <a href="/lms/courses" className="text-blue-700 hover:underline font-medium">Courses</a>
-            <a href="/lms/progress" className="text-blue-700 hover:underline font-medium">Tracking Progress</a>
+            <Link href="/lms/dashboard" className="text-blue-700 hover:underline font-medium">Home</Link>
+            <Link href="/lms/courses" className="text-blue-700 hover:underline font-medium">Courses</Link>
+            <Link href="/lms/progress" className="text-blue-700 hover:underline font-medium">Tracking Progress</Link>
           </nav>
           {/* Back button for admin/teacher */}
           {user?.role === 'admin' && (

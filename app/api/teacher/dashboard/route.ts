@@ -18,8 +18,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: false, error: coursesError.message }, { status: 500 });
   }
   // Map enrolled_count ke setiap course
+  type Course = { id: string; title: string; description: string; created_at: string; enrollments?: Array<{ count: number }> };
   const coursesWithCount = Array.isArray(courses)
-    ? courses.map((c: any) => ({
+    ? courses.map((c: Course) => ({
         ...c,
         enrolled_count: c.enrollments && Array.isArray(c.enrollments) && c.enrollments.length > 0
           ? c.enrollments[0].count || 0
@@ -37,7 +38,7 @@ export async function GET(request: Request) {
   }
 
   // Ambil progress siswa untuk courses teacher
-  const { data: progress, error: progressError } = await supabase
+  const { data: progress } = await supabase
     .from('progress')
     .select('id, enrollment_id, material_id, status, updated_at');
   // (opsional: filter progress by course/material if needed)

@@ -21,7 +21,7 @@ export async function DELETE(req: NextRequest) {
         }
         const bucket = storage.bucket(bucketName);
         await bucket.file(filePath).delete();
-      } catch (err) {
+      } catch (_err: unknown) {
         // Jika gagal hapus file, lanjutkan hapus DB
       }
     }
@@ -31,13 +31,14 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return NextResponse.json({ success: false, error: errorMsg }, { status: 500 });
   }
 }
 export async function PUT(req: NextRequest) {
   try {
-    let id, title, description, pdfFile, sections;
+    let id: string, title: string, description: string, pdfFile: File | null = null, sections: unknown;
     if (req.headers.get('content-type')?.includes('multipart/form-data')) {
       const formData = await req.formData();
       id = formData.get('id') as string;
@@ -55,7 +56,7 @@ export async function PUT(req: NextRequest) {
     if (!id || !title) {
       return NextResponse.json({ success: false, error: 'ID dan judul wajib diisi.' }, { status: 400 });
     }
-  let updateData: Record<string, unknown> = { title, description };
+    const updateData: Record<string, unknown> = { title, description };
     // Jika ada file PDF baru, upload dan replace
     if (pdfFile) {
       if (!storage) {
@@ -94,8 +95,9 @@ export async function PUT(req: NextRequest) {
       }
     }
     return NextResponse.json({ success: true, material: data?.[0] });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return NextResponse.json({ success: false, error: errorMsg }, { status: 500 });
   }
 }
 import { NextRequest, NextResponse } from 'next/server';
@@ -159,31 +161,35 @@ export async function POST(req: NextRequest) {
       }
       const material = insertResult.data[0];
       // Insert sections ke table material_sections
-  type Section = { title: string; content: string; order: number };
-  let sectionsArr: Section[] = [];
-      try {
-        sectionsArr = typeof sections === 'string' ? JSON.parse(sections) : sections;
-      } catch {
+      type Section = { title: string; content: string; order: number };
+      let sectionsArr: Section[] = [];
+      if (typeof sections === 'string') {
+        try {
+          sectionsArr = JSON.parse(sections);
+        } catch {
+          sectionsArr = [];
+        }
+      } else if (Array.isArray(sections)) {
+        sectionsArr = sections as Section[];
+      } else {
         sectionsArr = [];
       }
-      console.log('[DEBUG] Insert section:', { materialId: material?.id, sectionsArr });
       if (material && material.id && Array.isArray(sectionsArr) && sectionsArr.length > 0) {
-  const sectionRows = sectionsArr.map((section, idx) => ({
+        const sectionRows = sectionsArr.map((section, idx) => ({
           material_id: material.id,
           title: section.title,
           content: section.content,
           order: idx + 1
         }));
-        console.log('[DEBUG] Insert sectionRows:', sectionRows);
         const sectionInsert = await supabase.from('material_sections').insert(sectionRows);
         if (sectionInsert.error) {
-          console.error('[ERROR] Insert section:', sectionInsert.error);
           return NextResponse.json({ error: sectionInsert.error.message }, { status: 500 });
         }
       }
       return NextResponse.json({ success: true, material });
     }
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    return NextResponse.json({ error: errorMsg }, { status: 500 });
   }
 }

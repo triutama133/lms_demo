@@ -145,7 +145,7 @@ export default function ManageCourses() {
                   <div className="text-gray-500">Belum ada peserta yang enroll.</div>
                 ) : (
                   <ul className="mb-4">
-                    {participants.map((p: any) => (
+                    {participants.map((p: Participant) => (
                       <li key={p.id} className="mb-2">
                         <span className="font-semibold text-blue-700">{p.name}</span>
                         <span className="ml-2 text-gray-600">{p.email}</span>
@@ -183,7 +183,7 @@ export default function ManageCourses() {
                       });
                       const data = await res.json();
                       if (data.success) {
-                        setCourses(prev => prev.map((course: any) => course.id === courseToEdit.id ? { ...course, title: editTitle, description: editDescription } : course));
+                        setCourses(prev => prev.map((course: Course) => course.id === courseToEdit.id ? { ...course, title: editTitle, description: editDescription } : course));
                         setShowEditModal(false);
                         setCourseToEdit(null);
                       } else {
@@ -237,7 +237,7 @@ export default function ManageCourses() {
                         });
                         const data = await res.json();
                         if (data.success) {
-                          setCourses(prev => prev.filter((course: any) => course.id !== courseToDelete.id));
+                          setCourses(prev => prev.filter((course: Course) => course.id !== courseToDelete.id));
                           setShowModal(false);
                           setCourseToDelete(null);
                         } else {
