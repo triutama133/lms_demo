@@ -7,7 +7,7 @@ import { useParams } from 'next/navigation';
 import VideoEmbed from '../../../../../../components/VideoEmbed';
 
 export default function MaterialView() {
-  const { courseId, materialId } = useParams();
+  const { materialId } = useParams();
   type Section = { id?: string; title: string; content: string; order?: number };
   type Material = { id: string; title: string; description?: string; type: string; video_url?: string; pdf_url?: string; sections: Section[] };
   const [material, setMaterial] = useState<Material | null>(null);
@@ -25,7 +25,7 @@ export default function MaterialView() {
           if (typeof materialData.sections === 'string') {
             try {
               materialData.sections = JSON.parse(materialData.sections);
-            } catch (e) {
+            } catch {
               materialData.sections = [];
             }
           }
@@ -49,7 +49,7 @@ export default function MaterialView() {
   if (typeof sections === 'string') {
     try {
       sections = JSON.parse(sections);
-    } catch (e) {
+    } catch {
       sections = [];
     }
   }

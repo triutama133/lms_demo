@@ -44,10 +44,7 @@ function VideoEmbed({ url }: { url: string }) {
 }
 
 // Fungsi auto-link video
-function autoLinkVideo(text: string): string {
-  // Ganti semua link YouTube/Vimeo di manapun dalam teks menjadi [Video](url)
-  return text.replace(/(https?:\/\/(www\.)?(youtube\.com|youtu\.be|vimeo\.com)\/[\w\-\?=&#%\.\/]+)(?!\))/g, (url) => `[Video](${url})`);
-}
+// ...fungsi autoLinkVideo dihapus karena tidak digunakan...
 
 export default function MaterialDetailPage() {
   const { id } = useParams();
@@ -70,7 +67,7 @@ export default function MaterialDetailPage() {
           if (typeof materialData.sections === 'string') {
             try {
               materialData.sections = JSON.parse(materialData.sections);
-            } catch (e) {
+            } catch {
               materialData.sections = [];
             }
           }
@@ -143,34 +140,34 @@ export default function MaterialDetailPage() {
                               const { domToReact } = require('html-react-parser');
                               const htmlParser = require('htmlparser2');
                               const dom = htmlParser.parseDocument(section.content).children;
-                              let result: React.ReactNode[] = [];
-                              dom.forEach((node: any, idx: number) => {
-                                if (node.name === 'p' && (!node.children || node.children.length === 0)) {
+                              const result: React.ReactNode[] = [];
+                              dom.forEach((node: unknown, idx: number) => {
+                                if ((node as any).name === 'p' && (!(node as any).children || (node as any).children.length === 0)) {
                                   result.push(<br key={`br-main-${idx}`} />);
-                                } else if (node.name === 'p') {
+                                } else if ((node as any).name === 'p') {
                                   // Proses isi <p> seperti sebelumnya
                                   const videoRegex = /(https?:\/\/(www\.)?(youtube\.com|youtu\.be|vimeo\.com)\/[\w\-\?=&#%\.\/]+)/g;
-                                  let nodes: React.ReactNode[] = [];
-                                  node.children.forEach((child: any, cidx: number) => {
-                                    if (child.type === 'text' && typeof child.data === 'string') {
+                                  const nodes: React.ReactNode[] = [];
+                                  (node as any).children.forEach((child: unknown, cidx: number) => {
+                                    if ((child as any).type === 'text' && typeof (child as any).data === 'string') {
                                       let lastIndex = 0;
                                       let match;
-                                      while ((match = videoRegex.exec(child.data)) !== null) {
+                                      while ((match = videoRegex.exec((child as any).data)) !== null) {
                                         if (match.index > lastIndex) {
-                                          nodes.push(child.data.slice(lastIndex, match.index));
+                                          nodes.push((child as any).data.slice(lastIndex, match.index));
                                         }
                                         nodes.push(<VideoEmbed url={match[0]} key={`video-${idx}-${cidx}-${match.index}`} />);
                                         lastIndex = match.index + match[0].length;
                                       }
-                                      if (lastIndex < child.data.length) {
-                                        nodes.push(child.data.slice(lastIndex));
+                                      if (lastIndex < (child as any).data.length) {
+                                        nodes.push((child as any).data.slice(lastIndex));
                                       }
-                                    } else if (child.name === 'a' && child.attribs?.href && /youtu\.be|youtube\.com|vimeo\.com/.test(child.attribs.href)) {
-                                      nodes.push(<VideoEmbed url={child.attribs.href} key={`video-${idx}-${cidx}`} />);
+                                    } else if ((child as any).name === 'a' && (child as any).attribs?.href && /youtu\.be|youtube\.com|vimeo\.com/.test((child as any).attribs.href)) {
+                                      nodes.push(<VideoEmbed url={(child as any).attribs.href} key={`video-${idx}-${cidx}`} />);
                                     } else {
                                       const reactNodes = domToReact([child]);
                                       if (Array.isArray(reactNodes)) {
-                                        reactNodes.forEach((el, elIdx) => {
+                                        reactNodes.forEach((el: React.ReactNode, elIdx: number) => {
                                           nodes.push(<React.Fragment key={`node-${idx}-${cidx}-${elIdx}`}>{el}</React.Fragment>);
                                         });
                                       } else {
@@ -183,7 +180,7 @@ export default function MaterialDetailPage() {
                                   // Untuk node lain, render biasa
                                   const reactNodes = domToReact([node]);
                                   if (Array.isArray(reactNodes)) {
-                                    reactNodes.forEach((el, elIdx) => {
+                                    reactNodes.forEach((el: React.ReactNode, elIdx: number) => {
                                       result.push(<React.Fragment key={`other-${idx}-${elIdx}`}>{el}</React.Fragment>);
                                     });
                                   } else {
