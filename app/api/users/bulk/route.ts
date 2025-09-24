@@ -9,8 +9,20 @@ export async function POST(req: Request) {
     if (!Array.isArray(newUsers) || newUsers.length === 0) {
       return NextResponse.json({ success: false, error: 'Data user tidak valid' }, { status: 400 });
     }
-    const created: any[] = [];
-    const failed: any[] = [];
+    type CreatedUser = {
+      id: string;
+      name: string;
+      email: string;
+      role: string;
+      provinsi: string;
+    };
+    type FailedUser = {
+      idx: number;
+      errors: string[];
+      user: Record<string, unknown>;
+    };
+    const created: CreatedUser[] = [];
+    const failed: FailedUser[] = [];
     for (const [idx, u] of newUsers.entries()) {
       const errors: string[] = [];
       if (!u.name) errors.push('Field "name" wajib');
@@ -50,7 +62,8 @@ export async function POST(req: Request) {
         failed.push({ idx: idx+1, errors: [errInsert.message], user: u });
         continue;
       }
-      created.push({ ...user, password: undefined });
+  const { password, ...userWithoutPassword } = user;
+  created.push(userWithoutPassword);
     }
     if (failed.length > 0) {
       return NextResponse.json({ success: false, error: 'Beberapa user gagal diimport', detail: failed, created }, { status: 400 });
