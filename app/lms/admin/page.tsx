@@ -8,12 +8,17 @@ export default function AdminDashboard() {
   const router = useRouter();
   // State untuk import excel
   const [showImportModal, setShowImportModal] = useState(false);
-  const [importUsers, setImportUsers] = useState<any[]>([]);
+  interface ImportRow {
+    idx: number;
+    errors: string[];
+    row: Record<string, unknown>;
+  }
+  const [importUsers, setImportUsers] = useState<User[]>([]);
   const [importError, setImportError] = useState('');
   const [importLoading, setImportLoading] = useState(false);
-  const [invalidRows, setInvalidRows] = useState<any[]>([]);
-    const [incompleteRows, setIncompleteRows] = useState<{ idx: number; errors: string[]; row: any }[]>([]);
-    const [invalidValueRows, setInvalidValueRows] = useState<{ idx: number; errors: string[]; row: any }[]>([]);
+  const [invalidRows, setInvalidRows] = useState<ImportRow[]>([]);
+  const [incompleteRows, setIncompleteRows] = useState<ImportRow[]>([]);
+  const [invalidValueRows, setInvalidValueRows] = useState<ImportRow[]>([]);
   // State untuk modal tambah user
   const [showAddModal, setShowAddModal] = useState(false);
   const [addForms, setAddForms] = useState([
@@ -203,9 +208,9 @@ export default function AdminDashboard() {
                               const sheet = workbook.Sheets[workbook.SheetNames[0]];
                               const rows = XLSX.utils.sheet_to_json(sheet);
                               // Validasi kolom & error detail
-                              const validRows: any[] = [];
-                              const incompleteRows: { idx: number; errors: string[]; row: any }[] = [];
-                              const invalidRows: { idx: number; errors: string[]; row: any }[] = [];
+                              const validRows: User[] = [];
+                              const incompleteRows: { idx: number; errors: string[]; row: Record<string, unknown> }[] = [];
+                              const invalidRows: { idx: number; errors: string[]; row: Record<string, unknown> }[] = [];
                               rows.forEach((row: any, idx: number) => {
                                 const errors: string[] = [];
                                 if (!row.nama) errors.push('Kolom "nama" kosong');
@@ -222,7 +227,14 @@ export default function AdminDashboard() {
                                 if (valueErrors.length > 0) {
                                   invalidRows.push({ idx: idx+2, errors: valueErrors, row });
                                 } else {
-                                  validRows.push(row);
+                                  // Map Excel row to User type
+                                  validRows.push({
+                                    id: '', // id will be set by backend
+                                    name: row.nama,
+                                    email: row.email,
+                                    role: row.role,
+                                    provinsi: row.provinsi
+                                  });
                                 }
                               });
                               setImportUsers(validRows);
@@ -329,7 +341,7 @@ export default function AdminDashboard() {
                           <tbody>
                             {importUsers.map((u, idx) => (
                               <tr key={idx}>
-                                <td className="px-2 py-1">{u.nama}</td>
+                                <td className="px-2 py-1">{u.name}</td>
                                 <td className="px-2 py-1">{u.email}</td>
                                 <td className="px-2 py-1">{u.role}</td>
                                 <td className="px-2 py-1">{u.provinsi}</td>
@@ -351,7 +363,7 @@ export default function AdminDashboard() {
                           try {
                             // Map data ke format bulk API
                             const usersToImport = importUsers.map(u => ({
-                              name: u.nama,
+                              name: u.name,
                               email: u.email,
                               role: u.role,
                               provinsi: u.provinsi,
