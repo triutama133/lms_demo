@@ -36,7 +36,7 @@ export async function POST(req: Request) {
       // Set default password jika kosong
       const rawPassword = u.password && u.password.trim() ? u.password : 'ilmi123';
       // Cek email duplikat
-      const { data: existing, error: errCheck } = await supabase
+      const { data: existing } = await supabase
         .from('users')
         .select('id')
         .eq('email', u.email)
@@ -62,14 +62,14 @@ export async function POST(req: Request) {
         failed.push({ idx: idx+1, errors: [errInsert.message], user: u });
         continue;
       }
-  const { password, ...userWithoutPassword } = user;
+  const { password: _password, ...userWithoutPassword } = user;
   created.push(userWithoutPassword);
     }
     if (failed.length > 0) {
       return NextResponse.json({ success: false, error: 'Beberapa user gagal diimport', detail: failed, created }, { status: 400 });
     }
     return NextResponse.json({ success: true, created });
-  } catch (err) {
+  } catch {
     return NextResponse.json({ success: false, error: 'Gagal tambah user' }, { status: 500 });
   }
 }

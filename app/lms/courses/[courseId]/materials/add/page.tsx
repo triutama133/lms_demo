@@ -14,13 +14,13 @@ export default function AddMaterial() {
   const [sections, setSections] = useState<{ title: string; content: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [uploadPercent, setUploadPercent] = useState<number>(0);
+  // const [uploadPercent, setUploadPercent] = useState<number>(0); // removed unused
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    setUploadPercent(0);
+  // setUploadPercent(0); // removed unused
     if (type === 'pdf') {
       if (!pdfFile) {
         setError('File PDF wajib diisi');
@@ -40,12 +40,12 @@ export default function AddMaterial() {
           xhr.upload.onprogress = (event) => {
             if (event.lengthComputable) {
               const percent = Math.round((event.loaded / event.total) * 100);
-              setUploadPercent(percent);
+              // setUploadPercent(percent); // removed unused
             }
           };
           xhr.onload = () => {
             setLoading(false);
-            setUploadPercent(0);
+            // setUploadPercent(0); // removed unused
             if (xhr.status >= 200 && xhr.status < 300) {
               router.push(`/lms/courses/${courseId}/materials`);
               resolve();
@@ -61,7 +61,7 @@ export default function AddMaterial() {
           };
           xhr.onerror = () => {
             setLoading(false);
-            setUploadPercent(0);
+            // setUploadPercent(0); // removed unused
             setError('Gagal menambah materi');
             reject();
           };

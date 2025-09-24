@@ -65,7 +65,7 @@ export default function CourseMaterials() {
     const ref = useRef<HTMLLIElement>(null);
     const [, drop] = useDrop({
       accept: 'material',
-      hover(item: unknown, monitor: import('react-dnd').DropTargetMonitor) {
+  hover(item: unknown) {
         if (!ref.current) return;
         const dragItem = item as { index: number };
         if (typeof dragItem === 'object' && dragItem !== null && 'index' in dragItem && typeof dragItem.index === 'number') {
@@ -80,7 +80,7 @@ export default function CourseMaterials() {
     const [{ isDragging }, drag] = useDrag({
       type: 'material',
       item: { index },
-      collect: (monitor: import('react-dnd').DragSourceMonitor) => ({ isDragging: monitor.isDragging() }),
+      collect: () => ({ isDragging: false }),
     });
     drag(drop(ref));
     return (

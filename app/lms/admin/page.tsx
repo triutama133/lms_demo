@@ -206,12 +206,12 @@ export default function AdminDashboard() {
                               const data = await file.arrayBuffer();
                               const workbook = XLSX.read(data, { type: 'array' });
                               const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                              const rows = XLSX.utils.sheet_to_json(sheet);
+                              const rows = XLSX.utils.sheet_to_json<{ [key: string]: string }>(sheet);
                               // Validasi kolom & error detail
                               const validRows: User[] = [];
-                              const incompleteRows: { idx: number; errors: string[]; row: Record<string, unknown> }[] = [];
-                              const invalidRows: { idx: number; errors: string[]; row: Record<string, unknown> }[] = [];
-                              rows.forEach((row: any, idx: number) => {
+                              const incompleteRows: { idx: number; errors: string[]; row: { [key: string]: string } }[] = [];
+                              const invalidRows: { idx: number; errors: string[]; row: { [key: string]: string } }[] = [];
+                              rows.forEach((row, idx) => {
                                 const errors: string[] = [];
                                 if (!row.nama) errors.push('Kolom "nama" kosong');
                                 if (!row.email) errors.push('Kolom "email" kosong');
@@ -223,7 +223,7 @@ export default function AdminDashboard() {
                                 }
                                 // Validasi value
                                 const valueErrors: string[] = [];
-                                if (row.role && !['student','teacher','admin'].includes((row.role+'').toLowerCase())) valueErrors.push('Role harus student/teacher/admin');
+                                if (row.role && !['student','teacher','admin'].includes(row.role.toLowerCase())) valueErrors.push('Role harus student/teacher/admin');
                                 if (valueErrors.length > 0) {
                                   invalidRows.push({ idx: idx+2, errors: valueErrors, row });
                                 } else {
@@ -246,7 +246,7 @@ export default function AdminDashboard() {
                               } else {
                                 setImportError('');
                               }
-                            } catch (err) {
+                            } catch {
                               setImportError('Gagal membaca file. Pastikan format Excel benar.');
                             }
                           }}
@@ -379,8 +379,8 @@ export default function AdminDashboard() {
                             let data;
                             try {
                               data = await res.json();
-                            } catch (err) {
-                              setImportError('Gagal membaca response backend: ' + err);
+                            } catch {
+                              setImportError('Gagal membaca response backend.');
                               setImportLoading(false);
                               return;
                             }
@@ -396,9 +396,8 @@ export default function AdminDashboard() {
                                 console.error('Import error:', data);
                               }
                             }
-                          } catch (err) {
-                            setImportError('Gagal import user: ' + (typeof err === 'object' && err !== null && 'message' in err ? (err as any).message : String(err)));
-                            console.error('Import error:', err);
+                          } catch (e) {
+                            setImportError('Gagal import user.');
                           }
                           setImportLoading(false);
                         }}

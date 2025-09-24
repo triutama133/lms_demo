@@ -23,7 +23,7 @@ export async function PATCH(req: NextRequest) {
       }
     }
     return new Response(JSON.stringify({ success: true }), { status: 200 });
-  } catch (err) {
+  } catch {
     return new Response(JSON.stringify({ success: false, error: 'Failed to update order' }), { status: 500 });
   }
 }

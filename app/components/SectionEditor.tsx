@@ -6,7 +6,7 @@ import Image from '@tiptap/extension-image';
 // import BulletList from '@tiptap/extension-bullet-list';
 // import OrderedList from '@tiptap/extension-ordered-list';
 // import ListItem from '@tiptap/extension-list-item';
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 
 type SectionEditorProps = { value: string; onChange: (val: string) => void };
 
