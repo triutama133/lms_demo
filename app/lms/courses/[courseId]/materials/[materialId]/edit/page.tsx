@@ -137,7 +137,7 @@ export default function EditMaterial() {
             <div>
               <label className="block font-semibold mb-1">Section Materi</label>
               <div className="mb-2 text-sm text-gray-600 flex items-center gap-2">
-                <span>Urutkan section dengan cara drag & drop menggunakan ikon ☰ di kiri. Urutan akan disimpan saat menekan "Simpan Perubahan".</span>
+             <span>Urutkan section dengan cara drag & drop menggunakan ikon ☰ di kiri. Urutan akan disimpan saat menekan &quot;Simpan Perubahan&quot;.</span>
               </div>
               <DragDropContext
                 onDragEnd={(result: DropResult) => {

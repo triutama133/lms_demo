@@ -67,12 +67,13 @@ export default function CourseMaterials() {
       accept: 'material',
       hover(item: unknown, monitor: import('react-dnd').DropTargetMonitor) {
         if (!ref.current) return;
-        if (typeof item === 'object' && item !== null && 'index' in item && typeof (item as any).index === 'number') {
-          const dragIdx = (item as any).index as number;
+        const dragItem = item as { index: number };
+        if (typeof dragItem === 'object' && dragItem !== null && 'index' in dragItem && typeof dragItem.index === 'number') {
+          const dragIdx = dragItem.index as number;
           const hoverIdx = index;
           if (dragIdx === hoverIdx) return;
           moveMaterial(dragIdx, hoverIdx);
-          (item as any).index = hoverIdx;
+          dragItem.index = hoverIdx;
         }
       },
     });
@@ -85,7 +86,7 @@ export default function CourseMaterials() {
     return (
       <li ref={ref} className={`mb-4`} style={{ cursor: 'move', listStyle: 'none' }}>
         <div className={`flex items-center gap-3 p-4 bg-white border-2 rounded-xl shadow transition-all ${isDragging ? 'opacity-50 border-purple-400' : 'border-gray-200'}`}>
-          <span className="text-2xl text-purple-500 mr-2 select-none" title="Drag untuk mengatur urutan">☰</span>
+          <span className="text-2xl text-purple-500 mr-2 select-none" title="Drag untuk mengatur urutan">630</span>
           <div className="flex-1">
             <div className="font-semibold text-blue-700 text-lg">{material.title}</div>
             <div className="text-sm text-gray-500">{material.type === 'pdf' ? 'PDF' : 'Artikel/Markdown'}</div>
