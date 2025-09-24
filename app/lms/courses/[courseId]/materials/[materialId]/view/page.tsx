@@ -106,16 +106,17 @@ export default function MaterialView() {
                               replace: (domNode: DOMNode) => {
                                 if (domNode.type === 'tag' && domNode.name === 'p') {
                                   // Empty <p>
-                                  if (!domNode.children || domNode.children.length === 0 || domNode.children.every((c: any) => c.type === 'text' && c.data.trim() === '')) {
+                                  if (!domNode.children || domNode.children.length === 0 || domNode.children.every((c) => typeof c === 'object' && 'type' in c && c.type === 'text' && 'data' in c && typeof c.data === 'string' && c.data.trim() === '')) {
                                     return <div style={{height: '1em'}}>&nbsp;</div>;
                                   }
                                   // <p> hanya berisi satu <a> YouTube/Vimeo
                                   if (
                                     domNode.children &&
                                     domNode.children.length === 1 &&
-                                    domNode.children[0].type === 'tag' &&
-                                    domNode.children[0].name === 'a' &&
-                                    domNode.children[0].attribs &&
+                                    typeof domNode.children[0] === 'object' &&
+                                    'type' in domNode.children[0] && domNode.children[0].type === 'tag' &&
+                                    'name' in domNode.children[0] && domNode.children[0].name === 'a' &&
+                                    'attribs' in domNode.children[0] && domNode.children[0].attribs &&
                                     /youtu\.be|youtube\.com|vimeo\.com/.test(domNode.children[0].attribs.href)
                                   ) {
                                     return <VideoEmbed url={domNode.children[0].attribs.href} />;
