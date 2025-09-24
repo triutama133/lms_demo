@@ -86,7 +86,7 @@ export default function CourseMaterials() {
     return (
       <li ref={ref} className={`mb-4`} style={{ cursor: 'move', listStyle: 'none' }}>
         <div className={`flex items-center gap-3 p-4 bg-white border-2 rounded-xl shadow transition-all ${isDragging ? 'opacity-50 border-purple-400' : 'border-gray-200'}`}>
-          <span className="text-2xl text-purple-500 mr-2 select-none" title="Drag untuk mengatur urutan">630</span>
+          <span className="text-2xl text-purple-500 mr-2 select-none" title="Drag untuk mengatur urutan">☰</span>
           <div className="flex-1">
             <div className="font-semibold text-blue-700 text-lg">{material.title}</div>
             <div className="text-sm text-gray-500">{material.type === 'pdf' ? 'PDF' : 'Artikel/Markdown'}</div>
