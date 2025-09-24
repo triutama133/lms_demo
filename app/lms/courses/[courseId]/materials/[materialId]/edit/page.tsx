@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import dynamic from 'next/dynamic';
 import { useParams, useRouter } from 'next/navigation';
 const SectionEditor = dynamic<{
@@ -135,36 +136,74 @@ export default function EditMaterial() {
           {material?.type === 'markdown' && (
             <div>
               <label className="block font-semibold mb-1">Section Materi</label>
-              <div className="flex flex-col gap-4">
-                {sections.map((section, idx) => (
-                  <div key={section.id ?? idx} className="border rounded p-3 bg-gray-50 mb-2">
-                    <div className="flex gap-2 mb-2">
-                      <input
-                        type="text"
-                        value={section.title}
-                        onChange={e => {
-                          const newSections = [...sections];
-                          newSections[idx].title = e.target.value;
-                          setSections(newSections);
-                        }}
-                        placeholder={`Judul Section ${idx + 1}`}
-                        className="border rounded px-2 py-1 w-full"
-                      />
-                      <button type="button" className="text-red-600 font-bold px-2" onClick={() => setSections(secs => secs.filter((_, i) => i !== idx))}>Hapus</button>
-                    </div>
-                    <SectionEditor
-                        key={section.id ?? idx}
-                        value={section.content}
-                        onChange={(val: string) => {
-                          const newSections = [...sections];
-                          newSections[idx].content = val;
-                          setSections(newSections);
-                        }}
-                    />
-                  </div>
-                ))}
-                <button type="button" className="bg-blue-100 hover:bg-blue-200 text-blue-700 font-semibold px-3 py-1 rounded shadow w-fit" onClick={() => setSections(secs => [...secs, { title: '', content: '' }])}>Tambah Section</button>
+              <div className="mb-2 text-sm text-gray-600 flex items-center gap-2">
+                <span>Urutkan section dengan cara drag & drop menggunakan ikon ☰ di kiri. Urutan akan disimpan saat menekan "Simpan Perubahan".</span>
               </div>
+              <DragDropContext
+                onDragEnd={(result: DropResult) => {
+                  if (!result.destination) return;
+                  const newSections = [...sections];
+                  const [removed] = newSections.splice(result.source.index, 1);
+                  newSections.splice(result.destination.index, 0, removed);
+                  setSections(newSections);
+                }}
+              >
+                <Droppable droppableId="sections-droppable">
+                  {(provided) => (
+                    <div ref={provided.innerRef} {...provided.droppableProps}>
+                      {sections.map((section, idx) => (
+                        <Draggable key={section.id ?? `section-${idx}`} draggableId={section.id ?? `section-${idx}`} index={idx}>
+                          {(dragProvided, dragSnapshot) => (
+                            <div
+                              key={section.id ?? `section-${idx}`}
+                              ref={dragProvided.innerRef}
+                              {...dragProvided.draggableProps}
+                              {...dragProvided.dragHandleProps}
+                              className={`flex items-start gap-2 mb-4 bg-white ${dragSnapshot.isDragging ? 'shadow-lg border-purple-400 border-2' : ''}`}
+                              style={dragProvided.draggableProps.style}
+                            >
+                              <div className="flex flex-col gap-1 pt-3 cursor-grab">
+                                <span className="text-lg text-gray-400">☰</span>
+                              </div>
+                              <div className="border rounded p-3 bg-gray-50 flex-1">
+                                <div className="flex gap-2 mb-2 items-center">
+                                  <input
+                                    type="text"
+                                    value={section.title}
+                                    onChange={e => {
+                                      const newSections = [...sections];
+                                      newSections[idx].title = e.target.value;
+                                      setSections(newSections);
+                                    }}
+                                    placeholder={`Judul Section ${idx + 1}`}
+                                    className="border rounded px-2 py-1 w-full"
+                                  />
+                                  <button type="button" className="text-red-600 font-bold px-2" onClick={() => setSections(secs => secs.filter((_, i) => i !== idx))}>Hapus</button>
+                                </div>
+                                <SectionEditor
+                                  key={section.id ?? `section-${idx}`}
+                                  value={section.content}
+                                  onChange={(val: string) => {
+                                    const newSections = [...sections];
+                                    newSections[idx].content = val;
+                                    setSections(newSections);
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+                <button
+                  type="button"
+                  className="bg-blue-100 hover:bg-blue-200 text-blue-700 font-semibold px-3 py-1 rounded shadow w-fit mt-2"
+                  onClick={() => setSections(secs => [...secs, { id: `${Date.now()}-${Math.random()}`, title: '', content: '' }])}
+                >Tambah Section</button>
+              </DragDropContext>
             </div>
           )}
           <div className="flex gap-2 justify-end">

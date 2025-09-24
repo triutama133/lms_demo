@@ -3,14 +3,14 @@ import { supabase } from '../../utils/supabaseClient';
 import bcrypt from 'bcryptjs';
 
 export async function POST(request: Request) {
-  const { name, email, password } = await request.json();
+  const { name, email, password, provinsi } = await request.json();
 
   // Hash password
   const hashedPassword = await bcrypt.hash(password, 10);
 
   // Insert user to users table, set default role 'student'
   const { data, error } = await supabase.from('users').insert([
-    { name, email, password: hashedPassword, role: 'student' }
+    { name, email, password: hashedPassword, role: 'student', provinsi }
   ]);
 
   if (error) {

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import parse from 'html-react-parser';
 import { domToReact } from 'html-react-parser';
@@ -102,25 +102,9 @@ export default function MaterialView() {
                     </button>
                     {openSection === idx && (
                       <div className="px-6 pb-6 pt-2 prose prose-lg max-w-none text-gray-800 animate-fadein" style={{marginBottom: '0.5em'}}>
-                        <ReactMarkdown
-                          components={{
-                            a: ({ href }) => {
-                              if (typeof href === 'string' && (/youtu\.be|youtube\.com|vimeo\.com/.test(href))) {
-                                return <VideoEmbed url={href} />;
-                              }
-                              return <a href={href} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">{href}</a>;
-                            },
-                            p: ({ children }) => {
-                              const hasVideo = Array.isArray(children) && children.some(
-                                (child) => typeof child === 'object' && child?.type === VideoEmbed
-                              );
-                              if (hasVideo) {
-                                return <>{children}</>;
-                              }
-                              return <p>{children}</p>;
-                            },
-                          }}
-                        >{section.content || ''}</ReactMarkdown>
+                        {section.content && /<\/?[a-z][\s\S]*>/i.test(section.content)
+                          ? <div dangerouslySetInnerHTML={{ __html: section.content || '' }} />
+                          : <ReactMarkdown>{section.content || ''}</ReactMarkdown>}
                       </div>
                     )}
                   </div>

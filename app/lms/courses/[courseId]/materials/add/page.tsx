@@ -14,18 +14,19 @@ export default function AddMaterial() {
   const [sections, setSections] = useState<{ title: string; content: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [uploadPercent, setUploadPercent] = useState<number>(0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setUploadPercent(0);
     if (type === 'pdf') {
       if (!pdfFile) {
         setError('File PDF wajib diisi');
         setLoading(false);
         return;
       }
-      // Kirim ke API /api/materials
       const formData = new FormData();
       formData.append('title', title);
       formData.append('description', description);
@@ -33,22 +34,41 @@ export default function AddMaterial() {
       formData.append('course_id', courseId as string);
       formData.append('pdf', pdfFile);
       try {
-        const res = await fetch('/api/materials', {
-          method: 'POST',
-          body: formData,
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', '/api/materials');
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              const percent = Math.round((event.loaded / event.total) * 100);
+              setUploadPercent(percent);
+            }
+          };
+          xhr.onload = () => {
+            setLoading(false);
+            setUploadPercent(0);
+            if (xhr.status >= 200 && xhr.status < 300) {
+              router.push(`/lms/courses/${courseId}/materials`);
+              resolve();
+            } else {
+              try {
+                const data = JSON.parse(xhr.responseText);
+                setError(data.error || 'Gagal menambah materi');
+              } catch {
+                setError('Gagal menambah materi');
+              }
+              reject();
+            }
+          };
+          xhr.onerror = () => {
+            setLoading(false);
+            setUploadPercent(0);
+            setError('Gagal menambah materi');
+            reject();
+          };
+          xhr.send(formData);
         });
-        const data = await res.json();
-        if (res.ok) {
-          router.push(`/lms/courses/${courseId}/materials`);
-        } else {
-          setError(data.error || 'Gagal menambah materi');
-        }
-      } catch (err) {
-        if (err instanceof Error) {
-          setError(err.message || 'Gagal menambah materi');
-        } else {
-          setError('Gagal menambah materi');
-        }
+      } catch {
+        // error already handled above
       }
       setLoading(false);
       return;
@@ -112,6 +132,11 @@ export default function AddMaterial() {
             <div>
               <label className="block font-semibold mb-1">Upload PDF</label>
               <input type="file" accept="application/pdf" onChange={e => setPdfFile(e.target.files?.[0] || null)} className="w-full" />
+              {loading && (
+                <div className="w-full flex justify-center mt-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-4 border-b-4 border-purple-500 border-solid" />
+                </div>
+              )}
             </div>
           ) : (
             <div>

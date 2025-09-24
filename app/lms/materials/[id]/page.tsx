@@ -133,56 +133,127 @@ export default function MaterialDetailPage() {
                     </button>
                     {openSections[idx] && (
                       <div className="prose prose-lg max-w-none text-gray-800 px-6 pb-6">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            a: ({ href }) => {
-                              if (typeof href === 'string' && (/youtu\.be|youtube\.com|vimeo\.com/.test(href))) {
-                                return <VideoEmbed url={href} />;
-                              }
-                              return <a href={href} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">{href}</a>;
-                            },
-                            p: ({ children }) => {
-                              const videoRegex = /(https?:\/\/(www\.)?(youtube\.com|youtu\.be|vimeo\.com)\/[\w\-\?=&#%\.\/]+)/g;
-                              const processed = Array.isArray(children)
-                                ? children.flatMap((child, idx) => {
+                        {section.content && /<\/?[a-z][\s\S]*>/i.test(section.content)
+                          ? require('html-react-parser').default(section.content, {
+                              replace: (domNode: unknown, _index: number): string | boolean | void | object | React.ReactElement | null => {
+                                if (typeof domNode === 'string') {
+                                  const videoRegex = /^(https?:\/\/(www\.)?(youtube\.com|youtu\.be|vimeo\.com)\/[^\s<]+)$/;
+                                  if (videoRegex.test(domNode.trim())) {
+                                    return <VideoEmbed url={domNode.trim()} />;
+                                  }
+                                  return domNode;
+                                }
+                                if (typeof domNode !== 'object' || domNode === null) return null;
+                                const node = domNode as { name?: string; children?: unknown[]; attribs?: Record<string, string> };
+                                if (node.name === 'a' && node.attribs?.href && /youtu\.be|youtube\.com|vimeo\.com/.test(node.attribs.href)) {
+                                  return <VideoEmbed url={node.attribs.href} />;
+                                }
+                                if (node.name === 'p' && (!node.children || node.children.length === 0)) {
+                                  return <br />;
+                                }
+                                if (node.name === 'p') {
+                                  if (node.children && node.children.length === 1 && typeof node.children[0] === 'object') {
+                                    const childNode = node.children[0] as { name?: string; attribs?: Record<string, string> };
+                                    if (childNode.name === 'a' && childNode.attribs?.href && /youtu\.be|youtube\.com|vimeo\.com/.test(childNode.attribs.href)) {
+                                      return <VideoEmbed url={childNode.attribs.href} />;
+                                    }
+                                  }
+                                  const children = Array.isArray(node.children) ? node.children : [];
+                                  const processed: React.ReactNode[] = children.map((child, idx) => {
                                     if (typeof child === 'string') {
-                                      const parts = [];
-                                      let lastIndex = 0;
-                                      let match;
-                                      while ((match = videoRegex.exec(child)) !== null) {
-                                        if (match.index > lastIndex) {
-                                          parts.push(child.slice(lastIndex, match.index));
+                                      const videoRegex = /^(https?:\/\/(www\.)?(youtube\.com|youtu\.be|vimeo\.com)\/[^\s<]+)$/;
+                                      if (videoRegex.test(child.trim())) {
+                                        return <VideoEmbed url={child.trim()} key={`video-${idx}`} />;
+                                      }
+                                      return <React.Fragment key={`text-${idx}`}>{child}</React.Fragment>;
+                                    }
+                                    if (typeof child === 'object' && child !== null) {
+                                      const anchorNode = child as { name?: string; attribs?: Record<string, string> };
+                                      if (anchorNode.name === 'a' && anchorNode.attribs && typeof anchorNode.attribs.href === 'string' && /youtu\.be|youtube\.com|vimeo\.com/.test(anchorNode.attribs.href)) {
+                                        return <VideoEmbed url={anchorNode.attribs.href} key={`video-${idx}`} />;
+                                      }
+                                      // Only pass child to domToReact if it matches DOMNode structure
+                                      if ('type' in child || 'name' in child) {
+                                        const domToReact = require('html-react-parser').domToReact;
+                                        const reactNodes = domToReact([child as import('html-react-parser').DOMNode]);
+                                        if (Array.isArray(reactNodes)) {
+                                          return reactNodes.map((el, elIdx) => <React.Fragment key={`node-${idx}-${elIdx}`}>{el}</React.Fragment>);
                                         }
-                                        parts.push(<VideoEmbed url={match[0]} key={idx + '-' + match.index} />);
-                                        lastIndex = match.index + match[0].length;
+                                        return <React.Fragment key={`node-${idx}`}>{reactNodes}</React.Fragment>;
                                       }
-                                      if (lastIndex < child.length) {
-                                        parts.push(child.slice(lastIndex));
-                                      }
-                                      return parts;
+                                      // If not a DOMNode, skip domToReact
+                                      return null;
                                     }
-                                    if (
-                                      typeof child === 'object' &&
-                                      child?.type === 'a' &&
-                                      typeof child?.props?.href === 'string' &&
-                                      /youtu\.be|youtube\.com|vimeo\.com/.test(child.props.href)
-                                    ) {
-                                      return <VideoEmbed url={child.props.href} key={idx} />;
-                                    }
-                                    if (
-                                      typeof child === 'object' &&
-                                      child?.type === VideoEmbed
-                                    ) {
-                                      return child;
-                                    }
-                                    return child;
-                                  })
-                                : children;
-                              return <p>{processed}</p>;
-                            },
-                          }}
-                        >{section.content || ''}</ReactMarkdown>
+                                    return null;
+                                  });
+                                  if (Array.isArray(processed) && processed.length === 1 && React.isValidElement(processed[0]) && (processed[0] as { type?: unknown }).type === VideoEmbed) {
+                                    return processed[0];
+                                  }
+                                  return <p>{Array.isArray(processed) ? processed : [processed]}</p>;
+                                }
+                                return null;
+                              }
+                            })
+                          : (
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              components={{
+                                a: ({ href }) => {
+                                  if (typeof href === 'string' && (/youtu\.be|youtube\.com|vimeo\.com/.test(href))) {
+                                    return <VideoEmbed url={href} />;
+                                  }
+                                  return <a href={href} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">{href}</a>;
+                                },
+                                p: ({ children }) => {
+                                  const videoRegex = /(https?:\/\/(www\.)?(youtube\.com|youtu\.be|vimeo\.com)\/[\w\-\?=&#%\.\/]+)/g;
+                                  const processed = Array.isArray(children)
+                                    ? children.flatMap((child, idx) => {
+                                        if (typeof child === 'string') {
+                                          const parts = [];
+                                          let lastIndex = 0;
+                                          let match;
+                                          while ((match = videoRegex.exec(child)) !== null) {
+                                            if (match.index > lastIndex) {
+                                              parts.push(child.slice(lastIndex, match.index));
+                                            }
+                                            parts.push(<VideoEmbed url={match[0]} key={idx + '-' + match.index} />);
+                                            lastIndex = match.index + match[0].length;
+                                          }
+                                          if (lastIndex < child.length) {
+                                            parts.push(child.slice(lastIndex));
+                                          }
+                                          return parts;
+                                        }
+                                        if (
+                                          typeof child === 'object' &&
+                                          child?.type === 'a' &&
+                                          typeof child?.props?.href === 'string' &&
+                                          /youtu\.be|youtube\.com|vimeo\.com/.test(child.props.href)
+                                        ) {
+                                          return <VideoEmbed url={child.props.href} key={idx} />;
+                                        }
+                                        if (
+                                          typeof child === 'object' &&
+                                          child?.type === VideoEmbed
+                                        ) {
+                                          return child;
+                                        }
+                                        return child;
+                                      })
+                                    : children;
+                                  if (
+                                    Array.isArray(processed) &&
+                                    processed.length === 1 &&
+                                    React.isValidElement(processed[0]) &&
+                                    processed[0].type === VideoEmbed
+                                  ) {
+                                    return processed[0];
+                                  }
+                                  return <p>{processed}</p>;
+                                },
+                              }}
+                            >{section.content || ''}</ReactMarkdown>
+                          )}
                       </div>
                     )}
                   </div>

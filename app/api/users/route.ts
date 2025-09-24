@@ -6,7 +6,7 @@ export async function GET() {
   // Ambil semua user
   const { data, error } = await supabase
     .from('users')
-    .select('id, name, email, role');
+    .select('id, name, email, role, provinsi');
   if (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
@@ -15,11 +15,14 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   const body = await request.json();
-  const { id, name, email, role, password } = body;
+  const { id, name, email, role, password, provinsi } = body;
   if (!id || !name || !email || !role) {
     return NextResponse.json({ success: false, error: 'Semua field wajib diisi.' }, { status: 400 });
   }
   const updateData: Record<string, unknown> = { name, email, role };
+  if (provinsi !== undefined) {
+    updateData.provinsi = provinsi;
+  }
   if (password) {
     const hashed = await bcrypt.hash(password, 10);
     updateData.password = hashed;

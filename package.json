@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@google-cloud/storage": "^7.17.1",
+    "@hello-pangea/dnd": "^18.0.1",
     "@react-pdf-viewer/core": "^3.12.0",
     "@react-pdf-viewer/default-layout": "^3.12.0",
     "@supabase/supabase-js": "^2.57.4",
@@ -24,11 +25,14 @@
     "@tiptap/starter-kit": "^3.4.4",
     "autoprefixer": "^10.4.21",
     "bcryptjs": "^3.0.2",
+    "framer-motion": "^12.23.19",
     "html-react-parser": "^5.2.6",
     "lowlight": "^3.3.0",
     "next": "15.5.3",
     "pdfjs-dist": "^3.0.279",
     "react": "19.1.0",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
     "react-dom": "19.1.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1"
