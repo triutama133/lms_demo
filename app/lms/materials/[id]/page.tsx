@@ -7,7 +7,7 @@ import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-import parse, { domToReact } from 'html-react-parser';
+import parse, { domToReact, DOMNode } from 'html-react-parser';
 // Komponen video embed
 function VideoEmbed({ url }: { url: string }) {
   const ytMatch = url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})/);
@@ -134,9 +134,9 @@ export default function MaterialDetailPage() {
                     {openSections[idx] && (
                       <div className="prose prose-lg max-w-none text-gray-800 px-6 pb-6">
                         {section.content && /<\/?[a-z][\s\S]*>/i.test(section.content)
-                          ? parse(section.content, {
-                              replace: (domNode: any) => {
-                                if (domNode.name === 'p') {
+              ? parse(section.content, {
+                              replace: (domNode: DOMNode) => {
+                                if (domNode.type === 'tag' && domNode.name === 'p') {
                                   // Empty <p>
                                   if (!domNode.children || domNode.children.length === 0 || domNode.children.every((c: any) => c.type === 'text' && c.data.trim() === '')) {
                                     return <div style={{height: '1em'}}>&nbsp;</div>;
@@ -145,6 +145,7 @@ export default function MaterialDetailPage() {
                                   if (
                                     domNode.children &&
                                     domNode.children.length === 1 &&
+                                    domNode.children[0].type === 'tag' &&
                                     domNode.children[0].name === 'a' &&
                                     domNode.children[0].attribs &&
                                     /youtu\.be|youtube\.com|vimeo\.com/.test(domNode.children[0].attribs.href)
@@ -152,10 +153,10 @@ export default function MaterialDetailPage() {
                                     return <VideoEmbed url={domNode.children[0].attribs.href} />;
                                   }
                                   // <p> biasa
-                                  return <div style={{marginBottom: '1em', whiteSpace: 'pre-line'}}>{domToReact(domNode.children)}</div>;
+                                  return <div style={{marginBottom: '1em', whiteSpace: 'pre-line'}}>{domToReact(domNode.children as DOMNode[])}</div>;
                                 }
-                                if (domNode.name === 'a' && domNode.attribs && domNode.attribs.href && /youtu\.be|youtube\.com|vimeo\.com/.test(domNode.attribs.href)) {
-                                  if (domNode.parent && domNode.parent.name === 'p') {
+                                if (domNode.type === 'tag' && domNode.name === 'a' && domNode.attribs && domNode.attribs.href && /youtu\.be|youtube\.com|vimeo\.com/.test(domNode.attribs.href)) {
+                                  if (domNode.parent && domNode.parent.type === 'tag' && domNode.parent.name === 'p') {
                                     return <React.Fragment>{<VideoEmbed url={domNode.attribs.href} />}</React.Fragment>;
                                   }
                                   return <VideoEmbed url={domNode.attribs.href} />;
