@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 
-export default function LegacyMaterialEditRedirect({ params }: { params: { courseId: string; materialId: string } }) {
-  redirect(`/lms/teacher/courses/${params.courseId}/materials/${params.materialId}/edit`);
+export default async function LegacyMaterialEditRedirect({ params }: { params: Promise<{ courseId: string; materialId: string }> }) {
+  const { courseId, materialId } = await params;
+  redirect(`/lms/teacher/courses/${courseId}/materials/${materialId}/edit`);
 }

@@ -1,10 +1,10 @@
 import EditMaterialClient from "./EditMaterialClient";
 
-export default function EditMaterialPage({
+export default async function EditMaterialPage({
   params,
 }: {
-  params: { courseId: string; materialId: string };
+  params: Promise<{ courseId: string; materialId: string }>;
 }) {
-  const { courseId, materialId } = params;
+  const { courseId, materialId } = await params;
   return <EditMaterialClient courseId={courseId} materialId={materialId} />;
 }
