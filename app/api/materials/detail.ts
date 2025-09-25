@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { authErrorResponse, requireAuth } from '../../utils/auth';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl!, supabaseKey!);
 
 export async function GET(req: NextRequest) {
+  try {
+    await requireAuth();
+  } catch (error) {
+    return authErrorResponse(error);
+  }
   const { searchParams } = new URL(req.url);
   const material_id = searchParams.get('material_id');
   if (!material_id) {

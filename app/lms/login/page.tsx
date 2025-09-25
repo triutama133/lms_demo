@@ -1,6 +1,7 @@
 "use client";
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -24,10 +25,11 @@ export default function Login() {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(form),
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         setSuccess(true);
         setForm({ email: '', password: '', role: 'student' });
         // Simpan user ke localStorage dan redirect sesuai role
@@ -42,8 +44,8 @@ export default function Login() {
               localStorage.setItem('user_id', data.user.id); // Ensure user_id is available for enroll
           }
           // Redirect berdasarkan normalized role — only allow internal, safe routes
-            const safeRoutes = ['/lms/dashboard', '/lms/teacher/dashboard', '/lms/admin', '/'];
-            const target = data.user.role === 'student' ? '/lms/dashboard' : data.user.role === 'teacher' ? '/lms/teacher/dashboard' : data.user.role === 'admin' ? '/lms/admin' : '/';
+            const safeRoutes = ['/lms/student/dashboard', '/lms/teacher/dashboard', '/lms/admin', '/'];
+            const target = data.user.role === 'student' ? '/lms/student/dashboard' : data.user.role === 'teacher' ? '/lms/teacher/dashboard' : data.user.role === 'admin' ? '/lms/admin' : '/';
           if (safeRoutes.includes(target)) {
             router.replace(target);
           } else {
@@ -52,7 +54,7 @@ export default function Login() {
           }
         }
       } else {
-            setError('Gagal login');
+        setError(data.error || 'Gagal login');
       }
     } catch {
       setError('Terjadi kesalahan.');
@@ -63,6 +65,16 @@ export default function Login() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-100 via-white to-purple-100 flex flex-col items-center justify-center px-4 pt-24">
       <section className="max-w-md w-full bg-white/90 rounded-xl shadow-lg p-8">
+        <div className="flex flex-col items-center mb-6">
+          <Image
+            src="/ILMI logo new.png"
+            alt="ILMI Logo"
+            width={144}
+            height={144}
+            className="object-contain"
+            priority
+          />
+        </div>
         <h1 className="text-3xl font-bold text-blue-700 mb-6 text-center">Login</h1>
         <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
           <div>

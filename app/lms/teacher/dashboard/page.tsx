@@ -46,7 +46,7 @@ export default function TeacherDashboard() {
         <section className="max-w-3xl w-full bg-white/90 rounded-xl shadow-lg p-8 mt-8">
         <h1 className="text-2xl font-bold text-purple-700 mb-6 text-center">Teacher Dashboard</h1>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-          <Link href="/lms/courses/manage" className="bg-blue-100 hover:bg-blue-200 rounded-lg p-6 shadow text-center font-semibold text-blue-700 transition-all">
+          <Link href="/lms/teacher/courses/manage" className="bg-blue-100 hover:bg-blue-200 rounded-lg p-6 shadow text-center font-semibold text-blue-700 transition-all">
             Kelola Courses
           </Link>
           <Link href="/lms/teacher/progress" className="bg-green-100 hover:bg-green-200 rounded-lg p-6 shadow text-center font-semibold text-green-700 transition-all">
@@ -76,8 +76,8 @@ export default function TeacherDashboard() {
                           <span> — {c.description}</span>
                         </div>
                         <div className="mt-2 md:mt-0 flex gap-2">
-                          <Link href={`/lms/courses/${c.id}/materials`} className="bg-purple-100 hover:bg-purple-200 rounded px-3 py-1 text-purple-700 font-semibold text-sm transition-all">Kelola Materi</Link>
-                          <Link href={`/lms/courses/${c.id}/edit`} className="bg-blue-100 hover:bg-blue-200 rounded px-3 py-1 text-blue-700 font-semibold text-sm transition-all">Edit Course</Link>
+                          <Link href={`/lms/teacher/courses/${c.id}/materials`} className="bg-purple-100 hover:bg-purple-200 rounded px-3 py-1 text-purple-700 font-semibold text-sm transition-all">Kelola Materi</Link>
+                          <Link href={`/lms/teacher/courses/${c.id}/edit`} className="bg-blue-100 hover:bg-blue-200 rounded px-3 py-1 text-blue-700 font-semibold text-sm transition-all">Edit Course</Link>
                         </div>
                       </div>
                     </li>

@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../utils/supabaseClient';
+import { authErrorResponse, ensureRole, requireAuth } from '../../../utils/auth';
 
 export async function GET(request: Request) {
+  try {
+    const payload = await requireAuth();
+    ensureRole(payload, 'admin');
+  } catch (error) {
+    return authErrorResponse(error);
+  }
   const { searchParams } = new URL(request.url);
   const email = searchParams.get('email');
 

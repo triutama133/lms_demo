@@ -1,19 +1,44 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { Storage } from '@google-cloud/storage';
+import { createClient } from '@supabase/supabase-js';
+import { authErrorResponse, ensureRole, requireAuth } from '../../utils/auth';
+
+const bucketName: string = process.env.GCS_BUCKET_NAME || '';
+const credentials = process.env.GCS_CREDENTIALS_JSON ? JSON.parse(process.env.GCS_CREDENTIALS_JSON) : undefined;
+const storage = credentials ? new Storage({ credentials }) : undefined;
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl!, supabaseKey!);
+
+async function requireTeacherOrAdmin() {
+  const payload = await requireAuth();
+  ensureRole(payload, ['teacher', 'admin']);
+  return payload;
+}
+
 export async function DELETE(req: NextRequest) {
+  try {
+    await requireTeacherOrAdmin();
+  } catch (error) {
+    return authErrorResponse(error);
+  }
   try {
     const body = await req.json();
     const id = body.id;
     if (!id) {
       return NextResponse.json({ success: false, error: 'ID materi wajib diisi.' }, { status: 400 });
     }
-    // Ambil data materi untuk cek tipe/pdf_url
-    const { data: material, error: fetchError } = await supabase.from('materials').select('type, pdf_url').eq('id', id).single();
+    const { data: material, error: fetchError } = await supabase
+      .from('materials')
+      .select('type, pdf_url')
+      .eq('id', id)
+      .single();
     if (fetchError || !material) {
       return NextResponse.json({ success: false, error: 'Materi tidak ditemukan.' }, { status: 404 });
     }
-    // (Opsional) Hapus file PDF di GCS jika tipe pdf dan ada pdf_url
     if (material.type === 'pdf' && material.pdf_url && storage) {
       try {
-          // Ekstrak path file dari url
         const urlParts = material.pdf_url.split('/');
         const filePath = urlParts.slice(4).join('/');
         if (!bucketName) {
@@ -21,11 +46,10 @@ export async function DELETE(req: NextRequest) {
         }
         const bucket = storage.bucket(bucketName);
         await bucket.file(filePath).delete();
-         } catch {
-          // Jika gagal hapus file, lanjutkan hapus DB
+      } catch {
+        // Intentionally swallow errors when deleting remote file
       }
     }
-    // Hapus dari DB
     const { error } = await supabase.from('materials').delete().eq('id', id);
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -36,16 +60,25 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: false, error: errorMsg }, { status: 500 });
   }
 }
+
 export async function PUT(req: NextRequest) {
   try {
-    let id: string, title: string, description: string, pdfFile: File | null = null, sections: unknown;
+    await requireTeacherOrAdmin();
+  } catch (error) {
+    return authErrorResponse(error);
+  }
+  try {
+    let id: string;
+    let title: string;
+    let description: string;
+    let pdfFile: File | null = null;
+    let sections: unknown;
     if (req.headers.get('content-type')?.includes('multipart/form-data')) {
       const formData = await req.formData();
       id = formData.get('id') as string;
       title = formData.get('title') as string;
       description = formData.get('description') as string;
       pdfFile = formData.get('pdf') as File | null;
-      // Tidak support sections via multipart, hanya json
     } else {
       const body = await req.json();
       id = body.id;
@@ -57,7 +90,6 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'ID dan judul wajib diisi.' }, { status: 400 });
     }
     const updateData: Record<string, unknown> = { title, description };
-    // Jika ada file PDF baru, upload dan replace
     if (pdfFile) {
       if (!storage) {
         return NextResponse.json({ success: false, error: 'GCS credentials required.' }, { status: 500 });
@@ -71,22 +103,22 @@ export async function PUT(req: NextRequest) {
       });
       updateData.pdf_url = `https://storage.googleapis.com/${bucketName}/${gcsFileName}`;
     }
-    // Update ke DB
-    const { data, error } = await supabase.from('materials').update(updateData).eq('id', id).select();
+    const { data, error } = await supabase
+      .from('materials')
+      .update(updateData)
+      .eq('id', id)
+      .select();
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
-    // Jika ada sections, update material_sections
     if (Array.isArray(sections)) {
-      // Hapus semua section lama
       await supabase.from('material_sections').delete().eq('material_id', id);
-      // Insert ulang semua section baru
       if (sections.length > 0) {
         const sectionRows = sections.map((section, idx) => ({
           material_id: id,
           title: section.title,
           content: section.content,
-          order: idx + 1
+          order: idx + 1,
         }));
         const sectionInsert = await supabase.from('material_sections').insert(sectionRows);
         if (sectionInsert.error) {
@@ -100,20 +132,13 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ success: false, error: errorMsg }, { status: 500 });
   }
 }
-import { NextRequest, NextResponse } from 'next/server';
-import { Storage } from '@google-cloud/storage';
-import { createClient } from '@supabase/supabase-js';
-
-const bucketName: string = process.env.GCS_BUCKET_NAME || '';
-const credentials = process.env.GCS_CREDENTIALS_JSON ? JSON.parse(process.env.GCS_CREDENTIALS_JSON) : undefined;
-
-const storage = credentials ? new Storage({ credentials }) : undefined;
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl!, supabaseKey!);
 
 export async function POST(req: NextRequest) {
+  try {
+    await requireTeacherOrAdmin();
+  } catch (error) {
+    return authErrorResponse(error);
+  }
   try {
     const formData = await req.formData();
     const file = formData.get('pdf') as File | null;
@@ -136,58 +161,59 @@ export async function POST(req: NextRequest) {
         contentType: file.type,
       });
       const pdf_url = `https://storage.googleapis.com/${bucketName}/${gcsFileName}`;
-      // Insert ke DB
-      insertResult = await supabase.from('materials').insert({
-        title,
-        description,
-        course_id,
-        type,
-        pdf_url
-      }).select();
+      insertResult = await supabase
+        .from('materials')
+        .insert({
+          title,
+          description,
+          course_id,
+          type,
+          pdf_url,
+        })
+        .select();
       if (insertResult.error) {
         return NextResponse.json({ error: insertResult.error.message }, { status: 500 });
       }
       return NextResponse.json({ success: true, pdf_url, material: insertResult.data[0] });
-    } else {
-      // Insert markdown/article ke DB
-      insertResult = await supabase.from('materials').insert({
+    }
+
+    insertResult = await supabase
+      .from('materials')
+      .insert({
         title,
         description,
         course_id,
-        type
-      }).select();
-      if (insertResult.error) {
-        return NextResponse.json({ error: insertResult.error.message }, { status: 500 });
-      }
-      const material = insertResult.data[0];
-      // Insert sections ke table material_sections
-      type Section = { title: string; content: string; order: number };
-      let sectionsArr: Section[] = [];
-      if (typeof sections === 'string') {
-        try {
-          sectionsArr = JSON.parse(sections);
-        } catch {
-          sectionsArr = [];
-        }
-      } else if (Array.isArray(sections)) {
-        sectionsArr = sections as Section[];
-      } else {
+        type,
+      })
+      .select();
+    if (insertResult.error) {
+      return NextResponse.json({ error: insertResult.error.message }, { status: 500 });
+    }
+    const material = insertResult.data[0];
+    type Section = { title: string; content: string; order: number };
+    let sectionsArr: Section[] = [];
+    if (typeof sections === 'string') {
+      try {
+        sectionsArr = JSON.parse(sections);
+      } catch {
         sectionsArr = [];
       }
-      if (material && material.id && Array.isArray(sectionsArr) && sectionsArr.length > 0) {
-        const sectionRows = sectionsArr.map((section, idx) => ({
-          material_id: material.id,
-          title: section.title,
-          content: section.content,
-          order: idx + 1
-        }));
-        const sectionInsert = await supabase.from('material_sections').insert(sectionRows);
-        if (sectionInsert.error) {
-          return NextResponse.json({ error: sectionInsert.error.message }, { status: 500 });
-        }
-      }
-      return NextResponse.json({ success: true, material });
+    } else if (Array.isArray(sections)) {
+      sectionsArr = sections as Section[];
     }
+    if (material && material.id && Array.isArray(sectionsArr) && sectionsArr.length > 0) {
+      const sectionRows = sectionsArr.map((section, idx) => ({
+        material_id: material.id,
+        title: section.title,
+        content: section.content,
+        order: idx + 1,
+      }));
+      const sectionInsert = await supabase.from('material_sections').insert(sectionRows);
+      if (sectionInsert.error) {
+        return NextResponse.json({ error: sectionInsert.error.message }, { status: 500 });
+      }
+    }
+    return NextResponse.json({ success: true, material });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
     return NextResponse.json({ error: errorMsg }, { status: 500 });

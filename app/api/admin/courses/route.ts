@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../utils/supabaseClient';
+import { authErrorResponse, ensureRole, requireAuth } from '../../../utils/auth';
 
 export async function GET() {
+  try {
+    const payload = await requireAuth();
+    ensureRole(payload, 'admin');
+  } catch (error) {
+    return authErrorResponse(error);
+  }
   // Ambil semua course beserta nama teacher dan jumlah peserta
   const { data: courses, error: courseError } = await supabase
     .from('courses')

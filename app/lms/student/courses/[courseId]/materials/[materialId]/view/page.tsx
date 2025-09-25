@@ -1,9 +1,38 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import parse, { domToReact, DOMNode } from 'html-react-parser';
+import parse, { domToReact, DOMNode, Element } from 'html-react-parser';
 import { useParams } from 'next/navigation';
-import VideoEmbed from '../../../../../../components/VideoEmbed';
+import VideoEmbed, { canAutoEmbed } from '../../../../../../../components/VideoEmbed';
+import StudentHeader from '../../../../../../../components/StudentHeader';
+
+const HTTP_REGEX = /^https?:\/\//i;
+
+function normalizeExternalUrl(url: string) {
+  if (!url) return '';
+  return HTTP_REGEX.test(url) ? url : `https://${url}`;
+}
+
+function renderIframe(node: Element) {
+  const src = node.attribs?.src ? normalizeExternalUrl(node.attribs.src.trim()) : '';
+  if (!src) return null;
+  const className = node.attribs?.class || 'w-full min-h-[320px] rounded-lg border shadow-sm my-4';
+  const title = node.attribs?.title || 'Embedded content';
+  const allow = node.attribs?.allow;
+  const loadingAttr = node.attribs?.loading;
+  const loading: 'lazy' | 'eager' | undefined = loadingAttr === 'eager' ? 'eager' : 'lazy';
+  const allowFullScreen = typeof node.attribs?.allowfullscreen !== 'undefined' || typeof node.attribs?.allowFullScreen !== 'undefined';
+  return (
+    <iframe
+      src={src}
+      className={className}
+      title={title}
+      allow={allow}
+      loading={loading}
+      allowFullScreen={allowFullScreen}
+    />
+  );
+}
 
 export default function MaterialView() {
   const { materialId } = useParams();
@@ -40,9 +69,30 @@ export default function MaterialView() {
       });
   }, [materialId]);
 
-  if (loading) return <div className="p-8 text-center">Loading...</div>;
-  if (error) return <div className="p-8 text-center text-red-600">{error}</div>;
-  if (!material) return <div className="p-8 text-center">Materi tidak ditemukan.</div>;
+  if (loading) {
+    return (
+      <>
+        <StudentHeader />
+        <div className="p-8 text-center">Loading...</div>
+      </>
+    );
+  }
+  if (error) {
+    return (
+      <>
+        <StudentHeader />
+        <div className="p-8 text-center text-red-600">{error}</div>
+      </>
+    );
+  }
+  if (!material) {
+    return (
+      <>
+        <StudentHeader />
+        <div className="p-8 text-center">Materi tidak ditemukan.</div>
+      </>
+    );
+  }
 
   let sections = material.sections;
   if (typeof sections === 'string') {
@@ -57,7 +107,9 @@ export default function MaterialView() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex flex-col items-center px-4 pt-24">
+    <>
+      <StudentHeader />
+      <main className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex flex-col items-center px-4 pt-24">
       <section className="max-w-2xl w-full bg-white/90 rounded-xl shadow-lg p-8 mt-8">
         <h1 className="text-2xl font-bold text-purple-700 mb-6 text-center">{material.title}</h1>
         {/* Video player jika ada video_url */}
@@ -109,26 +161,30 @@ export default function MaterialView() {
                                   if (!domNode.children || domNode.children.length === 0 || domNode.children.every((c) => typeof c === 'object' && 'type' in c && c.type === 'text' && 'data' in c && typeof c.data === 'string' && c.data.trim() === '')) {
                                     return <div style={{height: '1em'}}>&nbsp;</div>;
                                   }
-                                  // <p> hanya berisi satu <a> YouTube/Vimeo
                                   if (
                                     domNode.children &&
                                     domNode.children.length === 1 &&
                                     typeof domNode.children[0] === 'object' &&
-                                    'type' in domNode.children[0] && domNode.children[0].type === 'tag' &&
-                                    'name' in domNode.children[0] && domNode.children[0].name === 'a' &&
-                                    'attribs' in domNode.children[0] && domNode.children[0].attribs &&
-                                    /youtu\.be|youtube\.com|vimeo\.com/.test(domNode.children[0].attribs.href)
+                                    'type' in domNode.children[0] && domNode.children[0].type === 'tag'
                                   ) {
-                                    return <VideoEmbed url={domNode.children[0].attribs.href} />;
+                                    const childEl = domNode.children[0] as Element;
+                                    if (childEl.name === 'a' && childEl.attribs?.href && canAutoEmbed(childEl.attribs.href)) {
+                                      return <VideoEmbed url={childEl.attribs.href} />;
+                                    }
+                                    if (childEl.name === 'iframe') {
+                                      const iframe = renderIframe(childEl);
+                                      if (iframe) return iframe;
+                                    }
                                   }
-                                  // <p> biasa
                                   return <div style={{marginBottom: '1em', whiteSpace: 'pre-line'}}>{domToReact(domNode.children as DOMNode[])}</div>;
                                 }
-                                if (domNode.type === 'tag' && domNode.name === 'a' && domNode.attribs && domNode.attribs.href && /youtu\.be|youtube\.com|vimeo\.com/.test(domNode.attribs.href)) {
-                                  if (domNode.parent && domNode.parent.type === 'tag' && domNode.parent.name === 'p') {
-                                    return <React.Fragment>{<VideoEmbed url={domNode.attribs.href} />}</React.Fragment>;
+                                if (domNode.type === 'tag' && domNode.name === 'a' && domNode.attribs?.href) {
+                                  if (canAutoEmbed(domNode.attribs.href)) {
+                                    return <VideoEmbed url={domNode.attribs.href} />;
                                   }
-                                  return <VideoEmbed url={domNode.attribs.href} />;
+                                }
+                                if (domNode.type === 'tag' && domNode.name === 'iframe') {
+                                  return renderIframe(domNode as Element);
                                 }
                               }
                             })
@@ -150,6 +206,7 @@ export default function MaterialView() {
           >Kembali</button>
         </div>
       </section>
-    </main>
+      </main>
+    </>
   );
 }

@@ -2,9 +2,12 @@ import { NextResponse } from 'next/server';
 import { supabase } from '../../../utils/supabaseClient';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
+import { authErrorResponse, ensureRole, requireAuth } from '../../../utils/auth';
 
 export async function POST(req: Request) {
   try {
+    const payload = await requireAuth();
+    ensureRole(payload, 'admin');
     const { users: newUsers } = await req.json();
     if (!Array.isArray(newUsers) || newUsers.length === 0) {
       return NextResponse.json({ success: false, error: 'Data user tidak valid' }, { status: 400 });
@@ -62,14 +65,18 @@ export async function POST(req: Request) {
         failed.push({ idx: idx+1, errors: [errInsert.message], user: u });
         continue;
       }
-  const { password: _password, ...userWithoutPassword } = user;
-  created.push(userWithoutPassword);
+      const { password: _pw, ...userWithoutPassword } = user;
+      void _pw;
+      created.push(userWithoutPassword);
     }
     if (failed.length > 0) {
       return NextResponse.json({ success: false, error: 'Beberapa user gagal diimport', detail: failed, created }, { status: 400 });
     }
     return NextResponse.json({ success: true, created });
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && (error.message === 'Unauthorized' || error.message === 'Forbidden')) {
+      return authErrorResponse(error);
+    }
     return NextResponse.json({ success: false, error: 'Gagal tambah user' }, { status: 500 });
   }
 }

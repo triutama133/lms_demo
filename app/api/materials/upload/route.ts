@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../utils/supabaseClient';
+import { authErrorResponse, ensureRole, requireAuth } from '../../../utils/auth';
 
 export const config = {
   api: {
@@ -8,6 +9,12 @@ export const config = {
 };
 
 export async function POST(request: Request) {
+  try {
+    const payload = await requireAuth();
+    ensureRole(payload, ['teacher', 'admin']);
+  } catch (error) {
+    return authErrorResponse(error);
+  }
   // Parse form data
   const formData = await request.formData();
   const type = formData.get('type');

@@ -1,12 +1,23 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../utils/supabaseClient';
+import { authErrorResponse, ensureRole, requireAuth } from '../../../utils/auth';
 
 export async function GET(request: Request) {
+  let payload;
+  try {
+    payload = await requireAuth();
+    ensureRole(payload, ['teacher', 'admin']);
+  } catch (error) {
+    return authErrorResponse(error);
+  }
   // Ambil user id dari query (atau session, jika sudah ada auth)
   const { searchParams } = new URL(request.url);
   const teacherId = searchParams.get('teacher_id');
   if (!teacherId) {
     return NextResponse.json({ success: false, error: 'Teacher ID wajib diisi.' }, { status: 400 });
+  }
+  if (payload.role === 'teacher' && payload.sub !== teacherId) {
+    return authErrorResponse(new Error('Forbidden'));
   }
 
   // Ambil courses yang dibuat oleh teacher, beserta jumlah peserta yang enroll

@@ -1,7 +1,7 @@
 "use client";
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function AdminDashboard() {
@@ -36,19 +36,71 @@ export default function AdminDashboard() {
     try {
       const user = JSON.parse(userData);
       if (user.role !== 'admin') {
-        router.replace('/lms/dashboard');
+      router.replace('/lms/student/dashboard');
       }
     } catch {
       router.replace('/lms/login');
     }
   }, [router]);
   // Logout handler
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/logout', { method: 'POST' });
+    } catch {}
     if (typeof window !== 'undefined') {
       localStorage.removeItem('lms_user');
       localStorage.removeItem('user_id');
     }
     router.replace('/lms/login');
+  };
+
+  const handleEnrollSubmit = async () => {
+    if (!enrollCourseIds.length) {
+      setEnrollError('Silakan pilih minimal satu course.');
+      setEnrollSuccess('');
+      return;
+    }
+    if (enrollOption === 'selected' && selectedUserIds.length === 0) {
+      setEnrollError('Pilih minimal satu user untuk didaftarkan.');
+      setEnrollSuccess('');
+      return;
+    }
+    setEnrollLoading(true);
+    setEnrollError('');
+    setEnrollSuccess('');
+    try {
+      let totalEnrolled = 0;
+      for (const courseId of enrollCourseIds) {
+        const payload = enrollOption === 'all'
+          ? { course_id: courseId, all_users: true }
+          : { course_id: courseId, user_ids: selectedUserIds };
+        const res = await fetch('/api/admin/enroll', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          totalEnrolled += data.enrolled_count ?? 0;
+        } else {
+          setEnrollError(data.error || 'Gagal mendaftarkan user ke course.');
+          setEnrollSuccess('');
+          setEnrollLoading(false);
+          return;
+        }
+      }
+      if (enrollOption === 'selected') {
+        setSelectedUserIds([]);
+      }
+      await reloadCourses();
+      setEnrollSuccess(`Berhasil mendaftarkan user ke ${enrollCourseIds.length} course (total ${totalEnrolled} pendaftaran baru).`);
+      setEnrollError('');
+    } catch (error) {
+      console.error('Enroll error', error);
+      setEnrollError('Gagal mendaftarkan user ke course.');
+      setEnrollSuccess('');
+    }
+    setEnrollLoading(false);
   };
   interface User {
     id: string;
@@ -82,97 +134,296 @@ export default function AdminDashboard() {
   const [participantsError, setParticipantsError] = useState('');
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [searchUser, setSearchUser] = useState('');
+  const [activeTab, setActiveTab] = useState<'users' | 'courses'>('users');
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [showEnrollModal, setShowEnrollModal] = useState(false);
+  const [enrollOption, setEnrollOption] = useState<'selected' | 'all'>('selected');
+  const [enrollCourseIds, setEnrollCourseIds] = useState<string[]>([]);
+  const [enrollSearch, setEnrollSearch] = useState('');
+  const [enrollLoading, setEnrollLoading] = useState(false);
+  const [enrollError, setEnrollError] = useState('');
+  const [enrollSuccess, setEnrollSuccess] = useState('');
+  const [searchCourse, setSearchCourse] = useState('');
+  const [showAddCourseModal, setShowAddCourseModal] = useState(false);
+  const [courseForm, setCourseForm] = useState({ title: '', description: '', teacher_id: '' });
+  const [courseError, setCourseError] = useState('');
+  const [courseLoading, setCourseLoading] = useState(false);
+
+  const selectedCount = selectedUserIds.length;
+
+  const roleSummary = useMemo(() => {
+    const summary = { admin: 0, teacher: 0, student: 0 };
+    users.forEach((user) => {
+      if (user.role === 'admin') summary.admin += 1;
+      if (user.role === 'teacher') summary.teacher += 1;
+      if (user.role === 'student') summary.student += 1;
+    });
+    return summary;
+  }, [users]);
+
+  const totalCourses = courses.length;
+  const totalEnrollments = useMemo(
+    () => courses.reduce((acc, course) => acc + (course.enrolled_count ?? 0), 0),
+    [courses]
+  );
+
+  const selectedLabel = useMemo(
+    () => (selectedCount > 0 ? `${selectedCount} user dipilih` : 'Belum ada user dipilih'),
+    [selectedCount]
+  );
+
+  const filteredUsers = useMemo(() => {
+    const keyword = searchUser.trim().toLowerCase();
+    if (!keyword) return users;
+    return users.filter((u) =>
+      u.name.toLowerCase().includes(keyword) ||
+      u.email.toLowerCase().includes(keyword)
+    );
+  }, [users, searchUser]);
+
+  const sortedUsers = useMemo(() => {
+    return [...filteredUsers].sort((a, b) => a.name.localeCompare(b.name, 'id', { sensitivity: 'base' }));
+  }, [filteredUsers]);
+
+  const totalUsers = sortedUsers.length;
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(totalUsers / usersPerPage)), [totalUsers]);
 
   useEffect(() => {
-    // Fetch users
-    fetch('/api/users').then(res => res.json()).then(userData => {
-      if (userData.success) setUsers(userData.users || []);
-    });
-    // Fetch courses with teacher & enrolled count
-    fetch('/api/admin/courses').then(res => res.json()).then(courseData => {
-      if (courseData.success) setCourses(courseData.courses || []);
-      setLoading(false);
-    }).catch(() => {
-      setError('Gagal fetch data');
-      setLoading(false);
-    });
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedUsers = useMemo(() => {
+    const start = (currentPage - 1) * usersPerPage;
+    return sortedUsers.slice(start, start + usersPerPage);
+  }, [sortedUsers, currentPage, usersPerPage]);
+
+  const pageUserIds = useMemo(() => paginatedUsers.map((u) => u.id), [paginatedUsers]);
+  const allPageSelected = pageUserIds.length > 0 && pageUserIds.every((id) => selectedUserIds.includes(id));
+  const filteredEnrollCourses = useMemo(() => {
+    const keyword = enrollSearch.trim().toLowerCase();
+    if (!keyword) return courses;
+    return courses.filter((course) =>
+      course.title.toLowerCase().includes(keyword) ||
+      (course.teacher_name || '').toLowerCase().includes(keyword)
+    );
+  }, [courses, enrollSearch]);
+
+  const filteredCourseList = useMemo(() => {
+    const keyword = searchCourse.trim().toLowerCase();
+    if (!keyword) return courses;
+    return courses.filter((course) =>
+      course.title.toLowerCase().includes(keyword) ||
+      (course.teacher_name || '').toLowerCase().includes(keyword)
+    );
+  }, [courses, searchCourse]);
+
+  const teacherOptions = useMemo(() => users.filter((u) => u.role === 'teacher'), [users]);
+
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUserIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const toggleSelectPage = (checked: boolean) => {
+    if (checked) {
+      setSelectedUserIds((prev) => Array.from(new Set([...prev, ...pageUserIds])));
+    } else {
+      setSelectedUserIds((prev) => prev.filter((id) => !pageUserIds.includes(id)));
+    }
+  };
+
+  const handleOpenEnrollModal = () => {
+    setEnrollOption(selectedUserIds.length > 0 ? 'selected' : 'all');
+    setEnrollCourseIds([]);
+    setEnrollSearch('');
+    setEnrollError('');
+    setEnrollSuccess('');
+    setShowEnrollModal(true);
+  };
+
+  const reloadUsers = useCallback(async () => {
+    try {
+      const res = await fetch('/api/users');
+      const data = await res.json();
+      if (data.success) {
+        setUsers(data.users || []);
+        setSelectedUserIds((prev) => prev.filter((id) => (data.users || []).some((u: User) => u.id === id)));
+      }
+    } catch (err) {
+      console.error('Gagal memuat data user', err);
+    }
   }, []);
+
+  const reloadCourses = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/courses');
+      const data = await res.json();
+      if (data.success) {
+        setCourses(data.courses || []);
+      } else {
+        setError(data.error || 'Gagal fetch data');
+      }
+    } catch {
+      setError('Gagal fetch data');
+    }
+  }, []);
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([reloadUsers(), reloadCourses()]);
+      setLoading(false);
+    };
+    loadData();
+  }, [reloadUsers, reloadCourses]);
 
   // ...existing code for UI and modals...
   return (
     <>
       {/* Header */}
-      <header className="w-full bg-blue-700 py-4 shadow-lg mb-6">
-        <div className="max-w-5xl mx-auto flex items-center justify-between px-6">
+      <header className="w-full bg-gradient-to-r from-indigo-800 via-blue-700 to-purple-700 shadow-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-3">
-            <Image src="/ILMI logo new.png" alt="ILMI Logo" width={48} height={48} className="h-12 w-12 object-contain" />
-            <h1 className="text-2xl font-bold text-white">LMS Admin Dashboard</h1>
+            <Image src="/ILMI logo new.png" alt="ILMI Logo" width={52} height={52} className="h-12 w-12 object-contain drop-shadow" />
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.45em] text-indigo-200">ILMI LMS</p>
+              <h1 className="text-2xl font-semibold text-white">Admin Dashboard</h1>
+            </div>
           </div>
           <nav className="flex items-center gap-2">
-            <Link href="/lms/dashboard" className="text-white hover:underline mx-2">Student</Link>
-            <Link href="/lms/teacher/dashboard" className="text-white hover:underline mx-2">Teacher</Link>
-            <Link href="/lms/admin" className="text-white font-bold underline mx-2">Admin</Link>
+            <Link href="/lms/student/dashboard" className="mx-1 rounded-full px-3 py-1.5 text-sm font-medium text-indigo-100 transition hover:bg-white/10">Student</Link>
+            <Link href="/lms/teacher/dashboard" className="mx-1 rounded-full px-3 py-1.5 text-sm font-medium text-indigo-100 transition hover:bg-white/10">Teacher</Link>
+            <Link href="/lms/admin" className="mx-1 rounded-full bg-white/15 px-3 py-1.5 text-sm font-semibold text-white shadow-inner">Admin</Link>
             <button
               onClick={handleLogout}
-              className="ml-4 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded shadow transition-all"
+              className="ml-3 inline-flex items-center rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-red-700"
             >Logout</button>
           </nav>
         </div>
       </header>
-      <main className="min-h-screen bg-gradient-to-br from-blue-100 via-white to-purple-100 flex flex-col items-center px-4 pt-0">
-        <section className="max-w-5xl w-full bg-white/90 rounded-xl shadow-lg p-8 mt-8">
+      <main className="min-h-screen bg-gradient-to-br from-blue-100 via-white to-purple-100 px-4 pb-16">
+        <div className="mx-auto w-full max-w-6xl space-y-8 pt-10">
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="rounded-2xl border border-white/60 bg-white/80 p-5 shadow-sm backdrop-blur">
+              <p className="text-xs font-semibold uppercase text-slate-500">Total User</p>
+              <p className="mt-3 text-3xl font-bold text-slate-900">{totalUsers}</p>
+              <p className="mt-2 text-xs text-slate-500">Admin {roleSummary.admin} · Teacher {roleSummary.teacher} · Student {roleSummary.student}</p>
+            </div>
+            <div className="rounded-2xl border border-white/60 bg-white/80 p-5 shadow-sm backdrop-blur">
+              <p className="text-xs font-semibold uppercase text-slate-500">Total Course</p>
+              <p className="mt-3 text-3xl font-bold text-slate-900">{totalCourses}</p>
+              <p className="mt-2 text-xs text-slate-500">Kelola kurikulum dan materi untuk setiap course aktif.</p>
+            </div>
+            <div className="rounded-2xl border border-white/60 bg-white/80 p-5 shadow-sm backdrop-blur">
+              <p className="text-xs font-semibold uppercase text-slate-500">Total Enrollment</p>
+              <p className="mt-3 text-3xl font-bold text-slate-900">{totalEnrollments}</p>
+              <p className="mt-2 text-xs text-slate-500">Akumulasi peserta dari seluruh course berjalan.</p>
+            </div>
+          </section>
+
+          <section className="rounded-3xl border border-white/60 bg-white/80 p-8 shadow-xl backdrop-blur">
           {loading ? (
-            <div className="text-center text-gray-500">Loading data...</div>
+            <div className="flex flex-col items-center justify-center gap-3 py-16 text-slate-500">
+              <span className="text-2xl" aria-hidden>⌛</span>
+              <p className="text-sm font-medium">Sedang memuat data terbaru...</p>
+            </div>
           ) : error ? (
-            <div className="text-center text-red-600">{error}</div>
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-6 py-6 text-center text-red-600 font-semibold">{error}</div>
           ) : (
             <>
+              <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-1 py-1 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('users')}
+                    className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-150 ${activeTab === 'users' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:text-blue-600'}`}
+                  >Manajemen User</button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('courses')}
+                    className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-150 ${activeTab === 'courses' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-600 hover:text-purple-600'}`}
+                  >Manajemen Course</button>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-xs text-slate-600 shadow-sm md:max-w-sm">
+                  Gunakan tab untuk berpindah antar manajemen. Setiap aksi dilengkapi tooltip dan hint agar lebih cepat dipahami.
+                </div>
+              </div>
+              {activeTab === 'users' && (
+                <>
               {/* User Management Table */}
-              <h2 className="text-xl font-bold text-purple-700 mb-4">Manajemen User</h2>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
-                <div className="flex flex-col md:flex-row gap-2 w-full">
-                  <input
-                    type="text"
-                    placeholder="Cari user..."
-                    className="w-full md:w-1/3 px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    value={searchUser}
-                    onChange={e => setSearchUser(e.target.value)}
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded shadow transition-all"
-                      onClick={() => { setShowAddModal(true); setAddForms([{ name: '', email: '', role: 'student', password: '', provinsi: '' }]); setAddError(''); }}
-                    >Tambah Akun</button>
-                    <button
-                      className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded shadow transition-all"
-                      onClick={() => { setShowImportModal(true); setImportUsers([]); setImportError(''); }}
-                    >Import User</button>
-                    <button
-                      className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold px-4 py-2 rounded shadow transition-all"
-                      onClick={async () => {
-                        // Export users to Excel
-                        const XLSX = await import('xlsx');
-                        const exportData = users.map(u => ({
-                          Nama: u.name,
-                          Email: u.email,
-                          Role: u.role,
-                          Provinsi: u.provinsi || ''
-                        }));
-                        const worksheet = XLSX.utils.json_to_sheet(exportData);
-                        const workbook = XLSX.utils.book_new();
-                        XLSX.utils.book_append_sheet(workbook, worksheet, 'Users');
-                        const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-                        const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = 'users.xlsx';
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        window.URL.revokeObjectURL(url);
-                      }}
-                    >Export User</button>
+              <div className="mb-6 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <h2 className="text-3xl font-bold text-slate-900">Manajemen User</h2>
+                  <p className="text-sm text-slate-500">Kelola akun, atur akses, dan proses administrasi secara instan.</p>
+                </div>
+                <span className="inline-flex items-center self-start rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600">
+                  {selectedLabel}
+                </span>
+              </div>
+              <div className="mb-6 rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-sm md:p-5">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div className="flex w-full flex-col gap-3 md:flex-row md:items-center">
+                    <div className="relative md:w-80">
+                      <input
+                        type="text"
+                        placeholder="Cari user berdasarkan nama atau email..."
+                        className="w-full rounded-xl border border-slate-200 bg-white/90 px-4 py-2.5 text-sm shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                        value={searchUser}
+                        onChange={e => setSearchUser(e.target.value)}
+                      />
+                      <span className="pointer-events-none absolute right-4 top-1/2 hidden -translate-y-1/2 text-slate-400 md:inline">⌕</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        className="rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:from-blue-600 hover:to-blue-700"
+                        onClick={() => { setShowAddModal(true); setAddForms([{ name: '', email: '', role: 'student', password: '', provinsi: '' }]); setAddError(''); }}
+                        title="Tambah akun user baru secara manual"
+                      >Tambah Akun</button>
+                      <button
+                        className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:from-emerald-600 hover:to-emerald-700"
+                        onClick={() => { setShowImportModal(true); setImportUsers([]); setImportError(''); }}
+                        title="Import user massal dari file Excel"
+                      >Import User</button>
+                      <button
+                        className="rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 px-4 py-2 text-sm font-semibold text-white shadow transition hover:from-amber-500 hover:to-amber-600"
+                        onClick={async () => {
+                          const XLSX = await import('xlsx');
+                          const exportData = users.map(u => ({
+                            Nama: u.name,
+                            Email: u.email,
+                            Role: u.role,
+                            Provinsi: u.provinsi || ''
+                          }));
+                          const worksheet = XLSX.utils.json_to_sheet(exportData);
+                          const workbook = XLSX.utils.book_new();
+                          XLSX.utils.book_append_sheet(workbook, worksheet, 'Users');
+                          const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+                          const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
+                          const url = window.URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = 'users.xlsx';
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          window.URL.revokeObjectURL(url);
+                        }}
+                        title="Unduh daftar user dalam format Excel"
+                      >Export User</button>
+                      <button
+                        className="rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:from-fuchsia-600 hover:to-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        onClick={handleOpenEnrollModal}
+                        title="Enroll user terpilih atau semua user ke course"
+                        disabled={courses.length === 0}
+                      >Enroll ke Course</button>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-xs text-blue-700 shadow-sm md:max-w-xs">
+                    <p className="mb-1 font-semibold">Petunjuk Singkat</p>
+                    <p>Pilih user lewat kolom pertama atau gunakan pencarian. Tekan tombol aksi untuk menjalankan fitur yang diinginkan.</p>
                   </div>
                 </div>
               {/* Modal Import Excel */}
@@ -396,7 +647,8 @@ export default function AdminDashboard() {
                                 console.error('Import error:', data);
                               }
                             }
-                          } catch (e) {
+                          } catch (error) {
+                            console.error('Gagal import user:', error);
                             setImportError('Gagal import user.');
                           }
                           setImportLoading(false);
@@ -520,91 +772,134 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               )}
-              <div className="overflow-x-auto mb-8 rounded-lg shadow">
-                <table className="min-w-full bg-white border border-gray-200 rounded-lg">
-                  <thead className="bg-blue-50">
+              <div className="mb-8 overflow-hidden rounded-2xl border border-slate-200 shadow-lg">
+                <table className="w-full bg-white text-sm text-slate-700">
+                  <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
                     <tr>
-                      <th className="px-4 py-3 border-b text-left font-semibold text-gray-700">Nama</th>
-                      <th className="px-4 py-3 border-b text-left font-semibold text-gray-700">Email</th>
-                      <th className="px-4 py-3 border-b text-left font-semibold text-gray-700">Role</th>
-                      <th className="px-4 py-3 border-b text-left font-semibold text-gray-700">Provinsi</th>
-                      <th className="px-4 py-3 border-b text-left font-semibold text-gray-700">Aksi</th>
+                      <th className="px-4 py-3 text-center font-semibold">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-400"
+                          checked={paginatedUsers.length > 0 && allPageSelected}
+                          onChange={e => toggleSelectPage(e.target.checked)}
+                          aria-label="Pilih semua user di halaman ini"
+                        />
+                      </th>
+                      <th className="px-4 py-3 text-left font-semibold">Nama</th>
+                      <th className="px-4 py-3 text-left font-semibold">Email</th>
+                      <th className="px-4 py-3 text-left font-semibold">Role</th>
+                      <th className="px-4 py-3 text-left font-semibold">Provinsi</th>
+                      <th className="px-4 py-3 text-left font-semibold">Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {(() => {
-                      // Filter, sort, and paginate users
-                      const filtered = users.filter(u =>
-                        u.name.toLowerCase().includes(searchUser.toLowerCase()) ||
-                        u.email.toLowerCase().includes(searchUser.toLowerCase())
-                      );
-                      const sorted = filtered.sort((a, b) => a.name.localeCompare(b.name, 'id', { sensitivity: 'base' }));
-                      const startIdx = (currentPage - 1) * usersPerPage;
-                      const paginated = sorted.slice(startIdx, startIdx + usersPerPage);
-                      return paginated.map((u) => (
-                        <tr key={u.id} className="hover:bg-blue-50 transition">
-                          <td className="px-4 py-2 border-b">{u.name}</td>
-                          <td className="px-4 py-2 border-b">{u.email}</td>
-                          <td className="px-4 py-2 border-b">{u.role}</td>
-                          <td className="px-4 py-2 border-b">{u.provinsi || '-'}</td>
-                          <td className="px-4 py-2 border-b">
-                            <button className="bg-blue-600 hover:bg-blue-700 text-white rounded px-3 py-1 font-semibold text-sm mr-2 shadow" onClick={() => { setEditUser(u); setEditForm({ name: u.name, email: u.email, role: u.role, password: '', provinsi: u.provinsi || '' }); setShowEditModal(true); }}>Edit</button>
-                            <button className="bg-red-600 hover:bg-red-700 text-white rounded px-3 py-1 font-semibold text-sm shadow" onClick={() => { setDeleteUser(u); setShowDeleteModal(true); }}>Delete</button>
+                    {paginatedUsers.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-8 text-center text-slate-400 text-sm">Belum ada user untuk ditampilkan.</td>
+                      </tr>
+                    ) : (
+                      paginatedUsers.map((u) => (
+                        <tr key={u.id} className="odd:bg-white even:bg-slate-50/80 hover:bg-indigo-50 transition">
+                          <td className="px-4 py-3 border-b border-slate-200 text-center">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-400"
+                              checked={selectedUserIds.includes(u.id)}
+                              onChange={() => toggleUserSelection(u.id)}
+                              aria-label={`Pilih user ${u.name}`}
+                            />
+                          </td>
+                          <td className="px-4 py-3 border-b border-slate-200 font-medium text-slate-800">{u.name}</td>
+                          <td className="px-4 py-3 border-b border-slate-200">{u.email}</td>
+                          <td className="px-4 py-3 border-b border-slate-200 capitalize">{u.role}</td>
+                          <td className="px-4 py-3 border-b border-slate-200">{u.provinsi || '-'}</td>
+                          <td className="px-4 py-3 border-b border-slate-200">
+                            <div className="flex flex-wrap gap-2">
+                              <button className="rounded-lg bg-indigo-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-600" onClick={() => { setEditUser(u); setEditForm({ name: u.name, email: u.email, role: u.role, password: '', provinsi: u.provinsi || '' }); setShowEditModal(true); }}>Edit</button>
+                              <button className="rounded-lg bg-rose-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-600" onClick={() => { setDeleteUser(u); setShowDeleteModal(true); }}>Delete</button>
+                            </div>
                           </td>
                         </tr>
-                      ));
-                    })()}
+                      ))
+                    )}
                   </tbody>
                 </table>
-                {/* User Table Statistics */}
-                {(() => {
-                  const filtered = users.filter(u =>
-                    u.name.toLowerCase().includes(searchUser.toLowerCase()) ||
-                    u.email.toLowerCase().includes(searchUser.toLowerCase())
-                  );
-                  const total = filtered.length;
-                  const startIdx = (currentPage - 1) * usersPerPage + 1;
-                  const endIdx = Math.min(currentPage * usersPerPage, total);
-                  return (
-                    <div className="flex justify-between items-center mt-2 mb-2 text-sm text-gray-700">
-                      <span>menampilkan {total === 0 ? 'Tidak ada data' : `${startIdx}-${endIdx} dari ${total}`} user</span>
-                    </div>
-                  );
-                })()}
-                {/* Pagination Controls */}
-                <div className="flex justify-center items-center gap-2 mt-2 mb-4">
-                  {Array.from({ length: Math.ceil(users.filter(u =>
-                    u.name.toLowerCase().includes(searchUser.toLowerCase()) ||
-                    u.email.toLowerCase().includes(searchUser.toLowerCase())
-                  ).length / usersPerPage) }, (_, i) => (
+                <div className="flex flex-col gap-2 border-t border-slate-200 px-4 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+                  <span>Menampilkan {totalUsers === 0 ? 'tidak ada data' : `${(currentPage - 1) * usersPerPage + 1}-${Math.min((currentPage - 1) * usersPerPage + paginatedUsers.length, totalUsers)} dari ${totalUsers}`} user</span>
+                  <span className="inline-flex items-center gap-2 text-sm font-semibold text-indigo-600">
+                    <span className="inline-flex h-2.5 w-2.5 rounded-full bg-indigo-500" /> {selectedCount} user dipilih
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-2 border-t border-slate-200 px-4 py-4">
+                  {totalUsers === 0 ? null : Array.from({ length: totalPages }, (_, i) => (
                     <button
                       key={i}
-                      className={`px-3 py-1 rounded ${currentPage === i + 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'} font-semibold`}
+                      className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${currentPage === i + 1 ? 'bg-indigo-600 text-white shadow' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                       onClick={() => setCurrentPage(i + 1)}
                     >{i + 1}</button>
                   ))}
                 </div>
               </div>
+              </>
+              )}
+              {activeTab === 'courses' && (
+                <>
               {/* Course Table */}
-              <h2 className="text-xl font-bold text-purple-700 mb-4">Daftar Course</h2>
-              <div className="overflow-x-auto rounded-lg shadow">
-                <table className="min-w-full bg-white border border-gray-200 rounded-lg">
-                  <thead className="bg-purple-50">
+              <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <h2 className="text-3xl font-bold text-slate-900">Manajemen Course</h2>
+                  <p className="text-sm text-slate-500">Pantau materi, pengajar, dan jumlah peserta dalam setiap course.</p>
+                </div>
+                <div className="flex flex-col gap-2 md:items-end">
+                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-end md:gap-3">
+                    <input
+                      type="text"
+                      placeholder="Cari course berdasarkan judul atau pengajar..."
+                      className="w-full rounded-xl border border-slate-200 bg-white/90 px-4 py-2.5 text-sm shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200 md:w-72"
+                      value={searchCourse}
+                      onChange={(e) => setSearchCourse(e.target.value)}
+                    />
+                    <button
+                      className="rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow transition hover:from-purple-600 hover:to-indigo-600 disabled:cursor-not-allowed disabled:opacity-60"
+                      onClick={() => {
+                        setCourseForm({ title: '', description: '', teacher_id: teacherOptions[0]?.id || '' });
+                        setCourseError('');
+                        setShowAddCourseModal(true);
+                      }}
+                      disabled={teacherOptions.length === 0}
+                    >Buat Course</button>
+                  </div>
+                  <span className="inline-flex items-center self-start rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-xs font-semibold text-purple-600 md:self-end">
+                    Total {totalCourses} course
+                  </span>
+                </div>
+              </div>
+              <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-lg">
+                <table className="w-full bg-white text-sm text-slate-700">
+                  <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
                     <tr>
-                      <th className="px-4 py-3 border-b text-left font-semibold text-gray-700">Nama Teacher</th>
-                      <th className="px-4 py-3 border-b text-left font-semibold text-gray-700">Judul Course</th>
-                      <th className="px-4 py-3 border-b text-left font-semibold text-gray-700">Jumlah Peserta</th>
-                      <th className="px-4 py-3 border-b text-left font-semibold text-gray-700">Aksi</th>
+                      <th className="px-4 py-3 text-left font-semibold">Nama Teacher</th>
+                      <th className="px-4 py-3 text-left font-semibold">Judul Course</th>
+                      <th className="px-4 py-3 text-left font-semibold">Jumlah Peserta</th>
+                      <th className="px-4 py-3 text-left font-semibold">Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {courses.map((c) => (
-                      <tr key={c.id} className="hover:bg-purple-50 transition">
-                        <td className="px-4 py-2 border-b">{c.teacher_name || '-'}</td>
-                        <td className="px-4 py-2 border-b">{c.title}</td>
-                        <td className="px-4 py-2 border-b">{c.enrolled_count || 0}</td>
-                        <td className="px-4 py-2 border-b flex gap-2">
-                          <button className="bg-green-600 hover:bg-green-700 text-white rounded px-3 py-1 font-semibold text-sm shadow" onClick={async () => {
+                    {filteredCourseList.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-8 text-center text-slate-400 text-sm">
+                          {courses.length === 0 ? 'Belum ada course yang aktif.' : 'Course tidak ditemukan.'}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredCourseList.map((c) => (
+                        <tr key={c.id} className="odd:bg-white even:bg-slate-50/80 hover:bg-fuchsia-50 transition">
+                          <td className="px-4 py-3 border-b border-slate-200 font-medium">{c.teacher_name || '-'}</td>
+                          <td className="px-4 py-3 border-b border-slate-200">{c.title}</td>
+                          <td className="px-4 py-3 border-b border-slate-200">{c.enrolled_count || 0}</td>
+                          <td className="px-4 py-3 border-b border-slate-200">
+                            <div className="flex flex-wrap gap-2">
+                              <button className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-600" onClick={async () => {
                             setSelectedCourse(c);
                             setShowParticipantsModal(true);
                             setParticipantsLoading(true);
@@ -622,15 +917,241 @@ export default function AdminDashboard() {
                             }
                             setParticipantsLoading(false);
                           }}>Lihat Peserta</button>
-                          <Link href={`/lms/courses/${c.id}/materials`} className="bg-purple-600 hover:bg-purple-700 text-white rounded px-3 py-1 font-semibold text-sm shadow">Lihat Materi</Link>
-                        </td>
-                      </tr>
-                    ))}
+                              <Link href={`/lms/courses/${c.id}/materials`} className="rounded-lg bg-indigo-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-600">Kelola Materi</Link>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
+              {activeTab === 'courses' && showParticipantsModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
+                    <h2 className="text-lg font-bold mb-4 text-green-700">Daftar Peserta</h2>
+                    <div className="mb-2 text-gray-700 font-semibold">Course: {selectedCourse?.title}</div>
+                    <div className="mb-4 text-gray-600">Jumlah Peserta: <span className="font-bold text-green-700">{participants.length}</span></div>
+                    {participantsLoading ? (
+                      <div className="text-center text-gray-500">Loading...</div>
+                    ) : participantsError ? (
+                      <div className="text-center text-red-600">{participantsError}</div>
+                    ) : participants.length === 0 ? (
+                      <div className="text-gray-500">Belum ada peserta yang enroll.</div>
+                    ) : (
+                      <ul className="mb-4">
+                        {participants.map((p: User) => (
+                          <li key={p.id} className="mb-2">
+                            <span className="font-semibold text-blue-700">{p.name}</span>
+                            <span className="ml-2 text-gray-600">{p.email}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <div className="flex justify-end gap-2">
+                      <button className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-4 py-2 rounded" onClick={() => { setShowParticipantsModal(false); setParticipants([]); setSelectedCourse(null); }}>
+                        Tutup
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {activeTab === 'courses' && showAddCourseModal && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+                  <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+                    <h2 className="mb-4 text-lg font-bold text-purple-700">Buat Course Baru</h2>
+                    <form
+                      className="flex flex-col gap-4"
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (!courseForm.title || !courseForm.description || !courseForm.teacher_id) {
+                          setCourseError('Semua field wajib diisi.');
+                          return;
+                        }
+                        setCourseLoading(true);
+                        setCourseError('');
+                        try {
+                          const res = await fetch('/api/courses', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(courseForm),
+                          });
+                          const data = await res.json();
+                          if (res.ok && data.success) {
+                            setShowAddCourseModal(false);
+                            setCourseForm({ title: '', description: '', teacher_id: '' });
+                            await reloadCourses();
+                          } else {
+                            setCourseError(data.error || 'Gagal membuat course.');
+                          }
+                        } catch (error) {
+                          console.error('Create course error', error);
+                          setCourseError('Gagal membuat course.');
+                        }
+                        setCourseLoading(false);
+                      }}
+                    >
+                      <div>
+                        <label className="mb-1 block font-semibold text-slate-700">Judul Course</label>
+                        <input
+                          type="text"
+                          value={courseForm.title}
+                          onChange={(e) => setCourseForm((prev) => ({ ...prev, title: e.target.value }))}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block font-semibold text-slate-700">Deskripsi</label>
+                        <textarea
+                          value={courseForm.description}
+                          onChange={(e) => setCourseForm((prev) => ({ ...prev, description: e.target.value }))}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                          rows={4}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block font-semibold text-slate-700">Pengajar</label>
+                        <select
+                          value={courseForm.teacher_id}
+                          onChange={(e) => setCourseForm((prev) => ({ ...prev, teacher_id: e.target.value }))}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                          required
+                        >
+                          <option value="" disabled>Pilih teacher</option>
+                          {teacherOptions.map((teacher) => (
+                            <option key={teacher.id} value={teacher.id}>{teacher.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {courseError && (
+                        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+                          {courseError}
+                        </div>
+                      )}
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                          onClick={() => {
+                            setShowAddCourseModal(false);
+                            setCourseError('');
+                          }}
+                        >Batal</button>
+                        <button
+                          type="submit"
+                          disabled={courseLoading}
+                          className="rounded-lg bg-gradient-to-r from-purple-500 to-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow hover:from-purple-600 hover:to-indigo-600 disabled:cursor-not-allowed disabled:opacity-60"
+                        >{courseLoading ? 'Menyimpan...' : 'Simpan Course'}</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+              </>
+              )}
+              {showEnrollModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full">
+                    <h2 className="text-lg font-bold mb-4 text-purple-700">Enroll User ke Course</h2>
+                    <div className="mb-4 text-sm text-gray-600">
+                      Pilih mode enroll dan course tujuan. Admin dapat mendaftarkan user yang dipilih atau seluruh user sekaligus.
+                    </div>
+                    <div className="mb-4">
+                      <span className="block font-semibold mb-2">Mode Enroll</span>
+                      <div className="flex flex-col gap-2">
+                        <label className={`flex items-center gap-2 ${selectedUserIds.length === 0 ? 'text-gray-400' : ''}`}>
+                          <input
+                            type="radio"
+                            name="enroll-mode"
+                            value="selected"
+                            checked={enrollOption === 'selected'}
+                            onChange={() => setEnrollOption('selected')}
+                            disabled={selectedUserIds.length === 0}
+                          />
+                          Enroll user yang dipilih ({selectedUserIds.length})
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="enroll-mode"
+                            value="all"
+                            checked={enrollOption === 'all'}
+                            onChange={() => setEnrollOption('all')}
+                          />
+                          Enroll semua user aktif
+                        </label>
+                      </div>
+                    </div>
+                    <div className="mb-4">
+                      <label className="block font-semibold mb-1">Cari & Pilih Course</label>
+                      <input
+                        type="text"
+                        value={enrollSearch}
+                        onChange={e => setEnrollSearch(e.target.value)}
+                        placeholder="Cari berdasarkan judul atau nama teacher"
+                        className="w-full border rounded px-3 py-2 mb-2"
+                      />
+                      <div className="max-h-48 overflow-y-auto border rounded">
+                        {filteredEnrollCourses.length === 0 ? (
+                          <div className="px-3 py-2 text-sm text-gray-500">Course tidak ditemukan.</div>
+                        ) : (
+                          filteredEnrollCourses.map(course => {
+                            const checked = enrollCourseIds.includes(course.id);
+                            return (
+                              <label key={course.id} className={`flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-purple-50 ${checked ? 'bg-purple-100' : ''}`}>
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={e => {
+                                    setEnrollCourseIds(prev =>
+                                      e.target.checked
+                                        ? [...prev, course.id]
+                                        : prev.filter(id => id !== course.id)
+                                    );
+                                  }}
+                                />
+                                <span className="flex-1">
+                                  <span className="font-semibold text-purple-700">{course.title}</span>
+                                  {course.teacher_name && (
+                                    <span className="ml-1 text-gray-500 text-xs">- {course.teacher_name}</span>
+                                  )}
+                                </span>
+                                <span className="text-xs text-gray-500">{course.enrolled_count || 0} peserta</span>
+                              </label>
+                            );
+                          })
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-600 mt-1">Course terpilih: {enrollCourseIds.length}</div>
+                    </div>
+                    {enrollError && <div className="mb-3 text-red-600 text-sm">{enrollError}</div>}
+                    {enrollSuccess && <div className="mb-3 text-green-600 text-sm">{enrollSuccess}</div>}
+                    <div className="flex justify-end gap-2">
+                      <button
+                        className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-4 py-2 rounded"
+                        onClick={() => {
+                          setShowEnrollModal(false);
+                          setEnrollError('');
+                          setEnrollSuccess('');
+                          setEnrollCourseIds([]);
+                          setEnrollLoading(false);
+                        }}
+                      >Batal</button>
+                      <button
+                        className="bg-purple-600 hover:bg-purple-700 text-white font-semibold px-4 py-2 rounded"
+                        onClick={handleEnrollSubmit}
+                        disabled={enrollLoading || courses.length === 0}
+                      >
+                        {enrollLoading ? 'Memproses...' : 'Enroll Sekarang'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
               {/* Edit User Modal */}
-              {showEditModal && editUser && (
+              {activeTab === 'users' && showEditModal && editUser && (
                 <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
                   <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
                     <h2 className="text-lg font-bold mb-4 text-blue-700">Edit User</h2>
@@ -739,7 +1260,7 @@ export default function AdminDashboard() {
                 </div>
               )}
               {/* Delete User Modal */}
-              {showDeleteModal && deleteUser && (
+              {activeTab === 'users' && showDeleteModal && deleteUser && (
                 <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
                   <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
                     <h2 className="text-lg font-bold mb-4 text-red-700">Konfirmasi Hapus User</h2>
@@ -761,6 +1282,7 @@ export default function AdminDashboard() {
                             const data = await res.json();
                             if (data.success) {
                               setUsers(prev => prev.filter((u: User) => u.id !== deleteUser.id));
+                              setSelectedUserIds(prev => prev.filter(id => id !== deleteUser.id));
                               setShowDeleteModal(false);
                               setDeleteUser(null);
                             } else {
@@ -775,40 +1297,10 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               )}
-              {/* Modal Peserta Course */}
-              {showParticipantsModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-                  <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
-                    <h2 className="text-lg font-bold mb-4 text-green-700">Daftar Peserta</h2>
-                    <div className="mb-2 text-gray-700 font-semibold">Course: {selectedCourse?.title}</div>
-                    <div className="mb-4 text-gray-600">Jumlah Peserta: <span className="font-bold text-green-700">{participants.length}</span></div>
-                    {participantsLoading ? (
-                      <div className="text-center text-gray-500">Loading...</div>
-                    ) : participantsError ? (
-                      <div className="text-center text-red-600">{participantsError}</div>
-                    ) : participants.length === 0 ? (
-                      <div className="text-gray-500">Belum ada peserta yang enroll.</div>
-                    ) : (
-                      <ul className="mb-4">
-                        {participants.map((p: User) => (
-                          <li key={p.id} className="mb-2">
-                            <span className="font-semibold text-blue-700">{p.name}</span>
-                            <span className="ml-2 text-gray-600">{p.email}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    <div className="flex justify-end gap-2">
-                      <button className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-4 py-2 rounded" onClick={() => { setShowParticipantsModal(false); setParticipants([]); setSelectedCourse(null); }}>
-                        Tutup
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
             </>
           )}
         </section>
+        </div>
       </main>
     </>
   );

@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../utils/supabaseClient';
+import { authErrorResponse, requireAuth } from '../../../utils/auth';
 
 export async function GET(req: Request) {
+  try {
+    await requireAuth();
+  } catch (error) {
+    return authErrorResponse(error);
+  }
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('material_id');
   if (!id) {
@@ -11,7 +17,7 @@ export async function GET(req: Request) {
   // Fetch material detail
   const { data, error } = await supabase
     .from('materials')
-    .select('id, title, description, type, pdf_url, content')
+    .select('id, title, description, type, pdf_url, content, course_id')
     .eq('id', id)
     .single();
 
@@ -62,6 +68,7 @@ export async function GET(req: Request) {
       type: data.type,
       pdf_url: data.pdf_url,
       content: data.content,
+      course_id: data.course_id,
       sections,
     },
   });

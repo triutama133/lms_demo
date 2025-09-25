@@ -1,11 +1,30 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../utils/supabaseClient';
+import { authErrorResponse, ensureRole, requireAuth } from '../../../utils/auth';
 
 export async function GET(request: Request) {
+  let payload;
+  try {
+    payload = await requireAuth();
+    ensureRole(payload, ['teacher', 'admin']);
+  } catch (error) {
+    return authErrorResponse(error);
+  }
   const { searchParams } = new URL(request.url);
   const courseId = searchParams.get('course_id');
   if (!courseId) {
     return NextResponse.json({ success: false, error: 'course_id wajib diisi' }, { status: 400 });
+  }
+  const { data: course, error: courseError } = await supabase
+    .from('courses')
+    .select('teacher_id')
+    .eq('id', courseId)
+    .single();
+  if (courseError || !course) {
+    return NextResponse.json({ success: false, error: 'Course tidak ditemukan' }, { status: 404 });
+  }
+  if (payload.role === 'teacher' && course.teacher_id !== payload.sub) {
+    return authErrorResponse(new Error('Forbidden'));
   }
 
   // Ambil enrollments untuk course ini
