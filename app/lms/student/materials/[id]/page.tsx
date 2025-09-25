@@ -51,12 +51,12 @@ function buildIframeClassName(customClass?: string) {
 
 type RichContentRenderer = (raw: string) => React.ReactNode;
 
-type HtmlReplacementFn = (domNode: DOMNode, index?: number) => string | boolean | void | object | Element | null;
+type HtmlReplacementFn = (domNode: DOMNode) => string | boolean | void | object | Element | null;
 
 function createHtmlReplacement(
   renderIframeNode: (node: Element) => React.ReactNode | null,
 ): HtmlReplacementFn {
-  function replacement(domNode: DOMNode, index?: number): string | boolean | void | object | Element | null {
+  function replacement(domNode: DOMNode): string | boolean | void | object | Element | null {
     if (domNode.type !== 'tag') {
       return undefined;
     }
