@@ -202,7 +202,7 @@ export default function EditMaterialClient({ courseId, materialId }: EditMateria
               <div className="mb-2 flex items-center gap-2 text-sm text-gray-600">
                 <span>
                   Urutkan section dengan cara drag & drop menggunakan ikon ☰ di kiri. Urutan akan disimpan saat menekan
-                  "Simpan Perubahan".
+                  &quot;Simpan Perubahan&quot;.
                 </span>
               </div>
               <DragDropContext
