@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 const SectionEditor = dynamic<{
   value: string;
   onChange: (val: string) => void;
-}>(() => import('../../../../../../components/SectionEditor'), { ssr: false });
+}>(() => import('../../../../../../../components/SectionEditor'), { ssr: false });
 
 export default function EditMaterial() {
   const { courseId, materialId } = useParams();
