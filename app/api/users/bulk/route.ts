@@ -2,15 +2,30 @@ import { NextResponse } from 'next/server';
 import { supabase } from '../../../utils/supabaseClient';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
-import { authErrorResponse, ensureRole, requireAuth } from '../../../utils/auth';
+import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../../utils/auth';
 
 export async function POST(req: Request) {
+  let auth;
   try {
-    const payload = await requireAuth();
-    ensureRole(payload, 'admin');
+    auth = await requireAuth();
+    ensureRole(auth.payload, 'admin');
+  } catch (error) {
+    return authErrorResponse(error);
+  }
+
+  const { payload, shouldRefresh } = auth;
+  const finalize = async (body: unknown, init: ResponseInit = {}) => {
+    const response = NextResponse.json(body, init);
+    if (shouldRefresh) {
+      await refreshAuthCookie(response, payload);
+    }
+    return response;
+  };
+
+  try {
     const { users: newUsers } = await req.json();
     if (!Array.isArray(newUsers) || newUsers.length === 0) {
-      return NextResponse.json({ success: false, error: 'Data user tidak valid' }, { status: 400 });
+      return finalize({ success: false, error: 'Data user tidak valid' }, { status: 400 });
     }
     type CreatedUser = {
       id: string;
@@ -70,13 +85,13 @@ export async function POST(req: Request) {
       created.push(userWithoutPassword);
     }
     if (failed.length > 0) {
-      return NextResponse.json({ success: false, error: 'Beberapa user gagal diimport', detail: failed, created }, { status: 400 });
+      return finalize({ success: false, error: 'Beberapa user gagal diimport', detail: failed, created }, { status: 400 });
     }
-    return NextResponse.json({ success: true, created });
+    return finalize({ success: true, created });
   } catch (error) {
     if (error instanceof Error && (error.message === 'Unauthorized' || error.message === 'Forbidden')) {
       return authErrorResponse(error);
     }
-    return NextResponse.json({ success: false, error: 'Gagal tambah user' }, { status: 500 });
+    return finalize({ success: false, error: 'Gagal tambah user' }, { status: 500 });
   }
 }

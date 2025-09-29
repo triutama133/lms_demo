@@ -4,7 +4,7 @@ import TeacherHeader from '../../../../components/TeacherHeader';
 import { useEffect, useState } from 'react';
 
 export default function ManageCourses() {
-  type Course = { id: string; title: string; description: string; enrolled_count?: number };
+  type Course = { id: string; title: string; description: string; enrolled_count?: number; categories?: string[] };
   type Participant = { id: string; name: string; email: string };
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +23,12 @@ export default function ManageCourses() {
   const [participantsLoading, setParticipantsLoading] = useState(false);
   const [participantsError, setParticipantsError] = useState('');
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+
+  // Category states for edit modal
+  const [categories, setCategories] = useState<Array<{ id: string; name: string; description?: string }>>([]);
+  const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
+  const [courseCategories, setCourseCategories] = useState<string[]>([]);
+  const [categorySearch, setCategorySearch] = useState('');
 
   useEffect(() => {
     const userData = typeof window !== 'undefined' ? localStorage.getItem('lms_user') : null;
@@ -53,6 +59,113 @@ export default function ManageCourses() {
       });
   }, []);
 
+  useEffect(() => {
+    // Fetch categories
+    fetch('/api/categories')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setCategories(data.categories || []);
+        }
+      })
+      .catch(() => {
+        // Ignore error for categories
+      });
+  }, []);
+
+  useEffect(() => {
+    if (categories.length > 0 && courseCategories.length >= 0) {
+      // Initialize selectedCats based on course categories
+      const catIds = categories
+        .filter(cat => courseCategories.includes(cat.name))
+        .map(cat => cat.id);
+      setSelectedCats(new Set(catIds));
+    }
+  }, [categories, courseCategories]);
+
+  const toggleCat = (id: string) => {
+    setSelectedCats(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  // Filter categories based on search
+  const filteredCategories = categories.filter(cat =>
+    cat.name.toLowerCase().includes(categorySearch.toLowerCase())
+  );
+
+  const handleSaveCategories = async () => {
+    if (!courseToEdit) return;
+    setEditLoading(true);
+    setEditError('');
+    try {
+      // Get current category names from course
+      const currentCatNames = courseCategories;
+      // Convert current category names to IDs
+      const currentCatIds = categories
+        .filter(cat => currentCatNames.includes(cat.name))
+        .map(cat => cat.id);
+
+      const currentCatSet = new Set(currentCatIds);
+      const newCatSet = selectedCats;
+
+      // Categories to add (in new set but not in current)
+      const toAdd = Array.from(newCatSet).filter(id => !currentCatSet.has(id));
+
+      // Categories to remove (in current but not in new)
+      const toRemove = Array.from(currentCatSet).filter(id => !newCatSet.has(id));
+
+      // Perform assignments
+      const assignPromises = toAdd.map(catId =>
+        fetch('/api/categories/assign-course', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ course_id: courseToEdit.id, category_id: catId }),
+        }).then(res => res.json())
+      );
+
+      // Perform unassignments
+      const unassignPromises = toRemove.map(catId =>
+        fetch('/api/categories/assign-course', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ course_id: courseToEdit.id, category_id: catId }),
+        }).then(res => res.json())
+      );
+
+      const allPromises = [...assignPromises, ...unassignPromises];
+      const results = await Promise.all(allPromises);
+
+      const failedCount = results.filter(result => !result.success).length;
+
+      if (failedCount > 0) {
+        setEditError(`Gagal menyimpan ${failedCount} perubahan kategori. Coba lagi.`);
+        return;
+      }
+
+      // Update local state - convert selected IDs back to names
+      const updatedCatNames = categories
+        .filter(cat => newCatSet.has(cat.id))
+        .map(cat => cat.name);
+      setCourseCategories(updatedCatNames);
+
+      // Update course in courses list
+      setCourses(prev => prev.map(course =>
+        course.id === courseToEdit.id
+          ? { ...course, categories: updatedCatNames }
+          : course
+      ));
+
+      setEditError('Kategori berhasil disimpan!');
+      setTimeout(() => setEditError(''), 3000);
+    } catch {
+      setEditError('Gagal menyimpan kategori');
+    }
+    setEditLoading(false);
+  };
+
   return (
     <>
       <TeacherHeader />
@@ -76,6 +189,15 @@ export default function ManageCourses() {
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                       <div>
                         <span className="font-semibold text-blue-700">{c.title}</span>
+                        {c.categories && c.categories.length > 0 && (
+                          <div className="inline-flex flex-wrap gap-1 ml-2">
+                            {c.categories.map((cat, idx) => (
+                              <span key={idx} className="inline-block bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-semibold text-xs border border-purple-200">
+                                {cat}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         <span className="inline-block bg-green-100 text-green-700 px-3 py-1 rounded-full font-semibold text-sm ml-2">
                           {c.enrolled_count ? `${c.enrolled_count} peserta` : '0 peserta'}
                         </span>
@@ -110,6 +232,7 @@ export default function ManageCourses() {
                             setCourseToEdit(c);
                             setEditTitle(c.title);
                             setEditDescription(c.description);
+                            setCourseCategories(c.categories || []);
                             setEditError('');
                             setShowEditModal(true);
                           }}
@@ -129,6 +252,35 @@ export default function ManageCourses() {
                 ))
               )}
             </ul>
+          )}
+
+          {/* Category Summary Section */}
+          {courses.length > 0 && categories.length > 0 && (
+            <div className="mt-8">
+              <h2 className="text-lg font-bold text-purple-700 mb-4">Ringkasan Kategori</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {categories.map((cat) => {
+                  const courseCount = courses.filter(c => c.categories?.includes(cat.name)).length;
+                  if (courseCount === 0) return null;
+                  return (
+                    <div key={cat.id} className="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-lg p-4 shadow-sm">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-semibold text-purple-800 text-sm">{cat.name}</span>
+                        <span className="bg-purple-200 text-purple-800 px-2 py-1 rounded-full text-xs font-medium">
+                          {courseCount}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-600">
+                        {courseCount} course{courseCount !== 1 ? 's' : ''} dalam kategori ini
+                      </div>
+                      {cat.description && (
+                        <div className="text-xs text-gray-500 mt-1 italic">{cat.description}</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           )}
           {/* Modal Peserta */}
           {showParticipantsModal && (
@@ -164,7 +316,7 @@ export default function ManageCourses() {
           {/* Modal edit course */}
           {showEditModal && courseToEdit && (
             <div className="fixed inset-0 bg-white bg-opacity-40 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full">
+              <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
                 <h2 className="text-lg font-bold mb-4 text-blue-700">Edit Course</h2>
                 <form
                   onSubmit={async e => {
@@ -203,6 +355,40 @@ export default function ManageCourses() {
                   <div>
                     <label className="block font-semibold mb-1">Deskripsi</label>
                     <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} required className="w-full border rounded px-3 py-2" />
+                  </div>
+                  <div className="rounded-xl border p-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-purple-700">Kategori Course</h3>
+                      <button type="button" onClick={handleSaveCategories} className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded">
+                        Simpan Kategori
+                      </button>
+                    </div>
+                    {categories.length === 0 ? (
+                      <p className="text-sm text-slate-500 mt-2">Belum ada kategori. Minta admin untuk membuat kategori terlebih dahulu.</p>
+                    ) : (
+                      <>
+                        <input
+                          type="text"
+                          value={categorySearch}
+                          onChange={e => setCategorySearch(e.target.value)}
+                          placeholder="Cari kategori..."
+                          className="w-full border rounded px-3 py-2 mt-3 mb-3 text-sm"
+                        />
+                        <ul className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                          {filteredCategories.map(cat => (
+                            <li key={cat.id}>
+                              <label className="inline-flex items-center gap-2 text-sm">
+                                <input type="checkbox" checked={selectedCats.has(cat.id)} onChange={() => toggleCat(cat.id)} />
+                                <span>{cat.name}</span>
+                              </label>
+                            </li>
+                          ))}
+                        </ul>
+                        {filteredCategories.length === 0 && categorySearch && (
+                          <p className="text-sm text-slate-500 mt-2">Tidak ada kategori yang cocok dengan &quot;{categorySearch}&quot;</p>
+                        )}
+                      </>
+                    )}
                   </div>
                   {editError && <div className="text-red-600 text-center">{editError}</div>}
                   <div className="flex gap-2 justify-end">

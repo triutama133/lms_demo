@@ -1,17 +1,27 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../utils/supabaseClient';
-import { authErrorResponse, requireAuth } from '../../../utils/auth';
+import { authErrorResponse, refreshAuthCookie, requireAuth } from '../../../utils/auth';
+import { isCourseAccessibleByUser } from '../../../utils/access';
 
 export async function GET(req: Request) {
+  let auth;
   try {
-    await requireAuth();
+    auth = await requireAuth();
   } catch (error) {
     return authErrorResponse(error);
   }
+  const { payload, shouldRefresh } = auth;
+  const finalize = async (body: unknown, init: ResponseInit = {}) => {
+    const response = NextResponse.json(body, init);
+    if (shouldRefresh) {
+      await refreshAuthCookie(response, payload);
+    }
+    return response;
+  };
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('material_id');
   if (!id) {
-    return NextResponse.json({ success: false, error: 'ID materi tidak ditemukan' });
+    return finalize({ success: false, error: 'ID materi tidak ditemukan' });
   }
 
   // Fetch material detail
@@ -22,7 +32,7 @@ export async function GET(req: Request) {
     .single();
 
   if (error || !data) {
-    return NextResponse.json({ success: false, error: 'Materi tidak ditemukan' });
+    return finalize({ success: false, error: 'Materi tidak ditemukan' });
   }
 
   type Section = { title: string; content: string; order: number };
@@ -59,7 +69,16 @@ export async function GET(req: Request) {
     }
   }
 
-  return NextResponse.json({
+  // Enforce course-level access for students
+  const role = (payload.role || '').toString();
+  if (role !== 'admin' && role !== 'teacher') {
+    const ok = await isCourseAccessibleByUser({ userId: payload.sub, role, courseId: data.course_id });
+    if (!ok) {
+      return finalize({ success: false, error: 'Forbidden' }, { status: 403 });
+    }
+  }
+
+  return finalize({
     success: true,
     material: {
       id: data.id,

@@ -4,9 +4,10 @@ import TeacherHeader from '../../../components/TeacherHeader';
 import { useEffect, useState } from 'react';
 
 export default function TeacherDashboard() {
-  type Course = { id: string; title: string; description: string; enrolled_count?: number };
+  type Course = { id: string; title: string; description: string; enrolled_count?: number; categories?: string[] };
+  type Category = { id: string; name: string; description?: string };
   const [courses, setCourses] = useState<Course[]>([]);
-  // ...existing code...
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -23,6 +24,8 @@ export default function TeacherDashboard() {
       setLoading(false);
       return;
     }
+
+    // Fetch courses
     fetch(`/api/teacher/dashboard?teacher_id=${user.id}`)
       .then(res => res.json())
       .then(data => {
@@ -31,10 +34,23 @@ export default function TeacherDashboard() {
         } else {
           setError(data.error || 'Gagal fetch data');
         }
-        setLoading(false);
       })
       .catch(() => {
         setError('Gagal fetch data');
+      });
+
+    // Fetch categories
+    fetch('/api/categories')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setCategories(data.categories || []);
+        }
+      })
+      .catch(() => {
+        // Ignore error for categories, course data is more important
+      })
+      .finally(() => {
         setLoading(false);
       });
   }, []);
@@ -70,7 +86,16 @@ export default function TeacherDashboard() {
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                         <div>
                           <span className="font-semibold text-blue-700">{c.title}</span>
-                          <span className="inline-block bg-green-100 text-green-700 px-3 py-1 rounded-full font-semibold text-sm ml-2">
+                          {c.categories && c.categories.length > 0 && (
+                            <div className="inline-flex flex-wrap gap-1 ml-2">
+                              {c.categories.map((cat, idx) => (
+                                <span key={idx} className="inline-block bg-gradient-to-r from-purple-100 to-purple-200 text-purple-800 px-3 py-1 rounded-full font-semibold text-xs border border-purple-300 shadow-sm">
+                                  {cat}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <span className="inline-block bg-gradient-to-r from-green-100 to-green-200 text-green-800 px-3 py-1 rounded-full font-semibold text-sm ml-2 border border-green-300 shadow-sm">
                             {c.enrolled_count ? `${c.enrolled_count} peserta` : '0 peserta'}
                           </span>
                           <span> — {c.description}</span>
@@ -85,7 +110,30 @@ export default function TeacherDashboard() {
                 </ul>
               )}
             </div>
-            {/* Statistik Peserta dihapus, badge peserta dipindahkan ke Courses Anda */}
+            <div className="mb-6">
+              <h2 className="text-lg font-bold text-purple-700 mb-2">Kategori Tersedia</h2>
+              <p className="text-sm text-gray-600 mb-3">Kategori yang dapat dipilih saat membuat atau mengedit course</p>
+              {categories.length === 0 ? (
+                <div className="text-gray-500">Belum ada kategori. Minta admin untuk membuat kategori terlebih dahulu.</div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {categories.map((cat: Category) => {
+                    const courseCount = courses.filter(c => c.categories?.includes(cat.name)).length;
+                    return (
+                      <div key={cat.id} className="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-lg p-4 text-center shadow-sm hover:shadow-md transition-shadow">
+                        <div className="font-semibold text-purple-800 text-sm mb-1">{cat.name}</div>
+                        {cat.description && (
+                          <div className="text-xs text-gray-600 mb-2">{cat.description}</div>
+                        )}
+                        <div className="text-xs bg-purple-200 text-purple-800 px-2 py-1 rounded-full inline-block">
+                          {courseCount} course{courseCount !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </>
         )}
         </section>

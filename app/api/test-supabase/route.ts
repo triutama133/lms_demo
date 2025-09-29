@@ -1,17 +1,27 @@
 import { supabase } from '../../utils/supabaseClient';
 import { NextResponse } from 'next/server';
-import { authErrorResponse, ensureRole, requireAuth } from '../../utils/auth';
+import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../utils/auth';
 
 export async function GET() {
+  let auth;
   try {
-    const payload = await requireAuth();
-    ensureRole(payload, 'admin');
+    auth = await requireAuth();
+    ensureRole(auth.payload, 'admin');
   } catch (error) {
     return authErrorResponse(error);
   }
+  const { payload, shouldRefresh } = auth;
   const { data, error } = await supabase.from('users').select('*').limit(1);
   if (error) {
-    return NextResponse.json({ success: false, error: error.message });
+    const response = NextResponse.json({ success: false, error: error.message });
+    if (shouldRefresh) {
+      await refreshAuthCookie(response, payload);
+    }
+    return response;
   }
-  return NextResponse.json({ success: true, data });
+  const response = NextResponse.json({ success: true, data });
+  if (shouldRefresh) {
+    await refreshAuthCookie(response, payload);
+  }
+  return response;
 }

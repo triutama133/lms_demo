@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { authErrorResponse, requireAuth } from '../../../utils/auth';
+import { authErrorResponse, refreshAuthCookie, requireAuth } from '../../../utils/auth';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -12,12 +12,20 @@ export async function POST(req: Request) {
   if (!user_id || !material_id || !status) {
     return NextResponse.json({ success: false, error: 'Data tidak lengkap' });
   }
-  let payload;
+  let auth;
   try {
-    payload = await requireAuth();
+    auth = await requireAuth();
   } catch (error) {
     return authErrorResponse(error);
   }
+  const { payload, shouldRefresh } = auth;
+  const finalize = async (body: unknown, init: ResponseInit = {}) => {
+    const response = NextResponse.json(body, init);
+    if (shouldRefresh) {
+      await refreshAuthCookie(response, payload);
+    }
+    return response;
+  };
   if (payload.sub !== user_id && payload.role !== 'admin' && payload.role !== 'teacher') {
     return authErrorResponse(new Error('Forbidden'));
   }
@@ -30,8 +38,8 @@ export async function POST(req: Request) {
     ], { onConflict: 'user_id,material_id' });
 
   if (error) {
-    return NextResponse.json({ success: false, error: 'Gagal update progress' });
+    return finalize({ success: false, error: 'Gagal update progress' });
   }
 
-  return NextResponse.json({ success: true });
+  return finalize({ success: true });
 }

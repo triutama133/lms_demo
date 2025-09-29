@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../utils/supabaseClient';
-import { authErrorResponse, ensureRole, requireAuth } from '../../../utils/auth';
+import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../../utils/auth';
 
 export async function GET(request: Request) {
-  let payload;
+  let auth;
   try {
-    payload = await requireAuth();
-    ensureRole(payload, ['teacher', 'admin']);
+    auth = await requireAuth();
+    ensureRole(auth.payload, ['teacher', 'admin']);
   } catch (error) {
     return authErrorResponse(error);
   }
+  const { payload, shouldRefresh } = auth;
   // Ambil user id dari query (atau session, jika sudah ada auth)
   const { searchParams } = new URL(request.url);
   const teacherId = searchParams.get('teacher_id');
@@ -23,19 +24,35 @@ export async function GET(request: Request) {
   // Ambil courses yang dibuat oleh teacher, beserta jumlah peserta yang enroll
   const { data: courses, error: coursesError } = await supabase
     .from('courses')
-    .select('id, title, description, created_at, enrollments:enrollments(count)')
+    .select('id, title, description, categories, created_at, enrollments:enrollments(count)')
     .eq('teacher_id', teacherId);
   if (coursesError) {
     return NextResponse.json({ success: false, error: coursesError.message }, { status: 500 });
   }
+
+  // Get all unique category IDs from all courses
+  const allCategoryIds = [...new Set((courses || []).flatMap((c) => c.categories || []).filter(Boolean))];
+  let categoryMap: Record<string, string> = {};
+  if (allCategoryIds.length > 0) {
+    const { data: categoryData, error: categoryError } = await supabase
+      .from('categories')
+      .select('id, name')
+      .in('id', allCategoryIds);
+    if (categoryError) {
+      return NextResponse.json({ success: false, error: categoryError.message }, { status: 500 });
+    }
+    categoryMap = Object.fromEntries((categoryData || []).map((row) => [row.id, row.name]));
+  }
+
   // Map enrolled_count ke setiap course
-  type Course = { id: string; title: string; description: string; created_at: string; enrollments?: Array<{ count: number }> };
+  type Course = { id: string; title: string; description: string; categories?: string[]; created_at: string; enrollments?: Array<{ count: number }> };
   const coursesWithCount = Array.isArray(courses)
     ? courses.map((c: Course) => ({
         ...c,
         enrolled_count: c.enrollments && Array.isArray(c.enrollments) && c.enrollments.length > 0
           ? c.enrollments[0].count || 0
-          : 0
+          : 0,
+        categories: (c.categories || []).map((catId) => categoryMap[catId]).filter(Boolean),
       }))
     : [];
 
@@ -54,5 +71,9 @@ export async function GET(request: Request) {
     .select('id, enrollment_id, material_id, status, updated_at');
   // (opsional: filter progress by course/material if needed)
 
-  return NextResponse.json({ success: true, courses: coursesWithCount, materials, progress });
+  const response = NextResponse.json({ success: true, courses: coursesWithCount, materials, progress });
+  if (shouldRefresh) {
+    await refreshAuthCookie(response, payload);
+  }
+  return response;
 }

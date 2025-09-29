@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../utils/supabaseClient';
 import bcrypt from 'bcryptjs';
-import { signAuthToken } from '../../../lib/auth';
+import { setAuthCookie } from '../../utils/auth';
 
 export async function POST(request: Request) {
   const { email, password, role } = await request.json();
@@ -31,26 +31,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: 'Role tidak sesuai.' }, { status: 403 });
   }
 
-  const token = await signAuthToken({
-    sub: user.id,
-    role: user.role,
-    email: user.email,
-    name: user.name,
-  });
-
   const response = NextResponse.json({
     success: true,
     user: { id: user.id, name: user.name, email: user.email, role: user.role },
   });
 
-  response.cookies.set({
-    name: 'lms_token',
-    value: token,
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: Number(process.env.JWT_COOKIE_MAX_AGE ?? 60 * 60),
+  await setAuthCookie(response, {
+    sub: user.id,
+    role: user.role,
+    email: user.email,
+    name: user.name,
   });
 
   return response;

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Storage } from '@google-cloud/storage';
 import { createClient } from '@supabase/supabase-js';
-import { authErrorResponse, ensureRole, requireAuth } from '../../utils/auth';
+import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../utils/auth';
 
 const bucketName: string = process.env.GCS_BUCKET_NAME || '';
 const credentials = process.env.GCS_CREDENTIALS_JSON ? JSON.parse(process.env.GCS_CREDENTIALS_JSON) : undefined;
@@ -12,22 +12,31 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl!, supabaseKey!);
 
 async function requireTeacherOrAdmin() {
-  const payload = await requireAuth();
-  ensureRole(payload, ['teacher', 'admin']);
-  return payload;
+  const auth = await requireAuth();
+  ensureRole(auth.payload, ['teacher', 'admin']);
+  return auth;
 }
 
 export async function DELETE(req: NextRequest) {
+  let auth;
   try {
-    await requireTeacherOrAdmin();
+    auth = await requireTeacherOrAdmin();
   } catch (error) {
     return authErrorResponse(error);
   }
+  const { payload, shouldRefresh } = auth;
+  const finalize = async (body: unknown, init: ResponseInit = {}) => {
+    const response = NextResponse.json(body, init);
+    if (shouldRefresh) {
+      await refreshAuthCookie(response, payload);
+    }
+    return response;
+  };
   try {
     const body = await req.json();
     const id = body.id;
     if (!id) {
-      return NextResponse.json({ success: false, error: 'ID materi wajib diisi.' }, { status: 400 });
+      return finalize({ success: false, error: 'ID materi wajib diisi.' }, { status: 400 });
     }
     const { data: material, error: fetchError } = await supabase
       .from('materials')
@@ -35,7 +44,7 @@ export async function DELETE(req: NextRequest) {
       .eq('id', id)
       .single();
     if (fetchError || !material) {
-      return NextResponse.json({ success: false, error: 'Materi tidak ditemukan.' }, { status: 404 });
+      return finalize({ success: false, error: 'Materi tidak ditemukan.' }, { status: 404 });
     }
     if (material.type === 'pdf' && material.pdf_url && storage) {
       try {
@@ -52,21 +61,30 @@ export async function DELETE(req: NextRequest) {
     }
     const { error } = await supabase.from('materials').delete().eq('id', id);
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      return finalize({ success: false, error: error.message }, { status: 500 });
     }
-    return NextResponse.json({ success: true });
+    return finalize({ success: true });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ success: false, error: errorMsg }, { status: 500 });
+    return finalize({ success: false, error: errorMsg }, { status: 500 });
   }
 }
 
 export async function PUT(req: NextRequest) {
+  let auth;
   try {
-    await requireTeacherOrAdmin();
+    auth = await requireTeacherOrAdmin();
   } catch (error) {
     return authErrorResponse(error);
   }
+  const { payload, shouldRefresh } = auth;
+  const finalize = async (body: unknown, init: ResponseInit = {}) => {
+    const response = NextResponse.json(body, init);
+    if (shouldRefresh) {
+      await refreshAuthCookie(response, payload);
+    }
+    return response;
+  };
   try {
     let id: string;
     let title: string;
@@ -87,12 +105,12 @@ export async function PUT(req: NextRequest) {
       sections = body.sections;
     }
     if (!id || !title) {
-      return NextResponse.json({ success: false, error: 'ID dan judul wajib diisi.' }, { status: 400 });
+      return finalize({ success: false, error: 'ID dan judul wajib diisi.' }, { status: 400 });
     }
     const updateData: Record<string, unknown> = { title, description };
     if (pdfFile) {
       if (!storage) {
-        return NextResponse.json({ success: false, error: 'GCS credentials required.' }, { status: 500 });
+        return finalize({ success: false, error: 'GCS credentials required.' }, { status: 500 });
       }
       const buffer = Buffer.from(await pdfFile.arrayBuffer());
       const gcsFileName = `materials/${id}/${Date.now()}_${pdfFile.name}`;
@@ -109,7 +127,7 @@ export async function PUT(req: NextRequest) {
       .eq('id', id)
       .select();
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      return finalize({ success: false, error: error.message }, { status: 500 });
     }
     if (Array.isArray(sections)) {
       await supabase.from('material_sections').delete().eq('material_id', id);
@@ -122,23 +140,32 @@ export async function PUT(req: NextRequest) {
         }));
         const sectionInsert = await supabase.from('material_sections').insert(sectionRows);
         if (sectionInsert.error) {
-          return NextResponse.json({ success: false, error: sectionInsert.error.message }, { status: 500 });
+          return finalize({ success: false, error: sectionInsert.error.message }, { status: 500 });
         }
       }
     }
-    return NextResponse.json({ success: true, material: data?.[0] });
+    return finalize({ success: true, material: data?.[0] });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ success: false, error: errorMsg }, { status: 500 });
+    return finalize({ success: false, error: errorMsg }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
+  let auth;
   try {
-    await requireTeacherOrAdmin();
+    auth = await requireTeacherOrAdmin();
   } catch (error) {
     return authErrorResponse(error);
   }
+  const { payload, shouldRefresh } = auth;
+  const finalize = async (body: unknown, init: ResponseInit = {}) => {
+    const response = NextResponse.json(body, init);
+    if (shouldRefresh) {
+      await refreshAuthCookie(response, payload);
+    }
+    return response;
+  };
   try {
     const formData = await req.formData();
     const file = formData.get('pdf') as File | null;
@@ -151,7 +178,7 @@ export async function POST(req: NextRequest) {
 
     if (type === 'pdf') {
       if (!file || !storage) {
-        return NextResponse.json({ error: 'PDF file and GCS credentials required.' }, { status: 400 });
+        return finalize({ error: 'PDF file and GCS credentials required.' }, { status: 400 });
       }
       const buffer = Buffer.from(await file.arrayBuffer());
       const gcsFileName = `materials/${course_id}/${Date.now()}_${file.name}`;
@@ -172,9 +199,9 @@ export async function POST(req: NextRequest) {
         })
         .select();
       if (insertResult.error) {
-        return NextResponse.json({ error: insertResult.error.message }, { status: 500 });
+        return finalize({ error: insertResult.error.message }, { status: 500 });
       }
-      return NextResponse.json({ success: true, pdf_url, material: insertResult.data[0] });
+      return finalize({ success: true, pdf_url, material: insertResult.data[0] });
     }
 
     insertResult = await supabase
@@ -187,7 +214,7 @@ export async function POST(req: NextRequest) {
       })
       .select();
     if (insertResult.error) {
-      return NextResponse.json({ error: insertResult.error.message }, { status: 500 });
+      return finalize({ error: insertResult.error.message }, { status: 500 });
     }
     const material = insertResult.data[0];
     type Section = { title: string; content: string; order: number };
@@ -210,12 +237,12 @@ export async function POST(req: NextRequest) {
       }));
       const sectionInsert = await supabase.from('material_sections').insert(sectionRows);
       if (sectionInsert.error) {
-        return NextResponse.json({ error: sectionInsert.error.message }, { status: 500 });
+        return finalize({ error: sectionInsert.error.message }, { status: 500 });
       }
     }
-    return NextResponse.json({ success: true, material });
+    return finalize({ success: true, material });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: errorMsg }, { status: 500 });
+    return finalize({ error: errorMsg }, { status: 500 });
   }
 }

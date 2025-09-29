@@ -1,5 +1,5 @@
 "use client";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import TeacherHeader from '../../../../components/TeacherHeader';
 
@@ -9,6 +9,36 @@ export default function AddCourse() {
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
+  const [categorySearch, setCategorySearch] = useState('');
+
+  useEffect(() => {
+    // Fetch categories
+    fetch('/api/categories')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setCategories(data.categories || []);
+        }
+      })
+      .catch(() => {
+        // Ignore error for categories, course can still be created without categories
+      });
+  }, []);
+
+  const toggleCat = (id: string) => {
+    setSelectedCats(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  // Filter categories based on search
+  const filteredCategories = categories.filter(cat =>
+    cat.name.toLowerCase().includes(categorySearch.toLowerCase())
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,6 +56,10 @@ export default function AddCourse() {
       setLoading(false);
       return;
     }
+
+    // Get selected category IDs
+    const selectedCatIds = Array.from(selectedCats);
+
     const res = await fetch('/api/courses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -33,6 +67,7 @@ export default function AddCourse() {
         title,
         description,
         teacher_id: user.id,
+        categories: selectedCatIds,
       }),
     });
     const data = await res.json();
@@ -58,6 +93,35 @@ export default function AddCourse() {
           <div>
             <label className="block font-semibold mb-1">Deskripsi</label>
             <textarea value={description} onChange={e => setDescription(e.target.value)} required className="w-full border rounded px-3 py-2" />
+          </div>
+          <div className="rounded-xl border p-4">
+            <h2 className="font-semibold text-purple-700 mb-3">Kategori Course</h2>
+            {categories.length === 0 ? (
+              <p className="text-sm text-slate-500">Belum ada kategori. Minta admin untuk membuat kategori terlebih dahulu.</p>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={categorySearch}
+                  onChange={e => setCategorySearch(e.target.value)}
+                  placeholder="Cari kategori..."
+                  className="w-full border rounded px-3 py-2 mb-3 text-sm"
+                />
+                <ul className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                  {filteredCategories.map(cat => (
+                    <li key={cat.id}>
+                      <label className="inline-flex items-center gap-2 text-sm">
+                        <input type="checkbox" checked={selectedCats.has(cat.id)} onChange={() => toggleCat(cat.id)} />
+                        <span>{cat.name}</span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+                {filteredCategories.length === 0 && categorySearch && (
+                  <p className="text-sm text-slate-500 mt-2">Tidak ada kategori yang cocok dengan &quot;{categorySearch}&quot;</p>
+                )}
+              </>
+            )}
           </div>
           {error && <div className="text-red-600 text-center">{error}</div>}
           <button type="submit" disabled={loading} className="bg-purple-600 hover:bg-purple-700 text-white font-semibold px-4 py-2 rounded shadow transition-all">

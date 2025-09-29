@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../utils/supabaseClient';
-import { authErrorResponse, ensureRole, requireAuth } from '../../../utils/auth';
+import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../../utils/auth';
 
 interface EnrollRequest {
   course_id?: string;
@@ -9,12 +9,22 @@ interface EnrollRequest {
 }
 
 export async function POST(req: Request) {
+  let auth;
   try {
-    const payload = await requireAuth();
-    ensureRole(payload, 'admin');
+    auth = await requireAuth();
+    ensureRole(auth.payload, 'admin');
   } catch (error) {
     return authErrorResponse(error);
   }
+
+  const { payload, shouldRefresh } = auth;
+  const finalize = async (body: unknown, init: ResponseInit = {}) => {
+    const response = NextResponse.json(body, init);
+    if (shouldRefresh) {
+      await refreshAuthCookie(response, payload);
+    }
+    return response;
+  };
 
   try {
     const body = (await req.json()) as EnrollRequest;
@@ -23,7 +33,7 @@ export async function POST(req: Request) {
     const enrollAll = Boolean(body.all_users);
 
     if (!courseId) {
-      return NextResponse.json({ success: false, error: 'course_id wajib diisi.' }, { status: 400 });
+      return finalize({ success: false, error: 'course_id wajib diisi.' }, { status: 400 });
     }
 
     let targetUserIds: string[] = [];
@@ -32,7 +42,7 @@ export async function POST(req: Request) {
         .from('users')
         .select('id');
       if (error) {
-        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+        return finalize({ success: false, error: error.message }, { status: 500 });
       }
       targetUserIds = (data || []).map((row) => row.id).filter(Boolean);
     } else {
@@ -40,7 +50,7 @@ export async function POST(req: Request) {
     }
 
     if (!targetUserIds.length) {
-      return NextResponse.json({ success: false, error: 'Tidak ada user yang dipilih untuk didaftarkan.' }, { status: 400 });
+      return finalize({ success: false, error: 'Tidak ada user yang dipilih untuk didaftarkan.' }, { status: 400 });
     }
 
     const uniqueUserIds = Array.from(new Set(targetUserIds));
@@ -52,14 +62,14 @@ export async function POST(req: Request) {
       .in('user_id', uniqueUserIds);
 
     if (existingError) {
-      return NextResponse.json({ success: false, error: existingError.message }, { status: 500 });
+      return finalize({ success: false, error: existingError.message }, { status: 500 });
     }
 
     const alreadyEnrolledIds = new Set((existingEnrollments || []).map((row) => row.user_id));
     const newUserIds = uniqueUserIds.filter((id) => !alreadyEnrolledIds.has(id));
 
     if (newUserIds.length === 0) {
-      return NextResponse.json({
+      return finalize({
         success: true,
         enrolled_count: 0,
         message: 'Semua user yang dipilih sudah terdaftar di course ini.',
@@ -76,16 +86,16 @@ export async function POST(req: Request) {
       .insert(enrollmentRows);
 
     if (insertError) {
-      return NextResponse.json({ success: false, error: insertError.message }, { status: 500 });
+      return finalize({ success: false, error: insertError.message }, { status: 500 });
     }
 
-    return NextResponse.json({
+    return finalize({
       success: true,
       enrolled_count: newUserIds.length,
       message: `Berhasil mendaftarkan ${newUserIds.length} user ke course tersebut.`,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Gagal mendaftarkan user ke course';
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return finalize({ success: false, error: message }, { status: 500 });
   }
 }

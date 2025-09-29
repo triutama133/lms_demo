@@ -1,14 +1,16 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../utils/supabaseClient';
-import { authErrorResponse, ensureRole, requireAuth } from '../../../utils/auth';
+import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../../utils/auth';
 
 export async function GET(request: Request) {
+  let auth;
   try {
-    const payload = await requireAuth();
-    ensureRole(payload, 'admin');
+    auth = await requireAuth();
+    ensureRole(auth.payload, 'admin');
   } catch (error) {
     return authErrorResponse(error);
   }
+  const { payload, shouldRefresh } = auth;
   const { searchParams } = new URL(request.url);
   const email = searchParams.get('email');
 
@@ -31,5 +33,9 @@ export async function GET(request: Request) {
   }
 
   // Development-only: return user row (includes password hash). Remove after debugging.
-  return NextResponse.json({ success: true, user: data[0] });
+  const response = NextResponse.json({ success: true, user: data[0] });
+  if (shouldRefresh) {
+    await refreshAuthCookie(response, payload);
+  }
+  return response;
 }
