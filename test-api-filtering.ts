@@ -65,7 +65,46 @@ async function testAPIFiltering() {
     });
   }
 
-  console.log(`\nTotal courses: ${allCourses.length}, Filtered: ${filteredCourses.length}`);
+  // Test with specific user ID
+  const testUserId = '40bf0f90-de6d-4b2f-95a8-8145a6323bb5';
+  const { data: specificUser, error: userError } = await supabase
+    .from('users')
+    .select('id, email, categories, role')
+    .eq('id', testUserId)
+    .single();
+
+  if (userError) {
+    console.log('Error fetching specific user:', userError);
+  } else {
+    console.log(`\nSpecific user ${testUserId}:`);
+    console.log(`Email: ${specificUser.email}`);
+    console.log(`Role: ${specificUser.role}`);
+    console.log(`Categories: ${JSON.stringify(specificUser.categories)}`);
+
+    // Test filtering for this user
+    const userCategories = new Set(specificUser.categories || []);
+    console.log(`User category set: ${Array.from(userCategories)}`);
+
+    const filteredCourses = allCourses.filter(course => {
+      const courseCats = course.categories || [];
+      if (courseCats.length === 0) return true; // public course
+
+      for (const cat of courseCats) {
+        if (userCategories.has(cat)) return true;
+      }
+      return false;
+    });
+
+    console.log('\nFiltered courses for this specific user:');
+    if (filteredCourses.length === 0) {
+      console.log('No courses accessible!');
+    } else {
+      filteredCourses.forEach(course => {
+        console.log(`- ${course.title}: ${JSON.stringify(course.categories)}`);
+      });
+    }
+    console.log(`Total courses: ${allCourses.length}, Filtered: ${filteredCourses.length}`);
+  }
 }
 
 testAPIFiltering().catch(console.error);

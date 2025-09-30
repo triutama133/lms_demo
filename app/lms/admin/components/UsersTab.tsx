@@ -17,7 +17,6 @@ interface UsersTabProps {
   userFilters: UserFiltersState;
   searchUser: string;
   searchField: UserSearchField;
-  appliedSearchField: UserSearchField;
   categories: Category[];
   userCatsMap: Record<string, string[]>;
   totalPages: number;
@@ -63,7 +62,6 @@ interface UsersTabProps {
   deleteLoading: boolean;
 
     // Enroll handlers
-  onEnrollCoursesChange: (courses: Array<{ id: string; title: string; description: string }>) => void;
   onEnrollUsers: () => void;
   enrollCourses: Array<{ id: string; title: string; description: string }>;
   enrollLoading: boolean;
@@ -137,7 +135,6 @@ export default function UsersTab({
   userFilters,
   searchUser,
   searchField,
-  appliedSearchField,
   categories,
   userCatsMap,
   totalPages,
@@ -204,7 +201,6 @@ export default function UsersTab({
   onImportCatSearchChange,
   onAddFormChange,
   onAddUser,
-  onEnrollCoursesChange,
   onEnrollUsers,
   onDeleteUser,
   onEditFormChange,
@@ -472,7 +468,7 @@ export default function UsersTab({
                   type="text"
                   placeholder="Cari provinsi..."
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 mb-2"
-                  onChange={(e) => {
+                  onChange={() => {
                     // This would filter the provinces list, but for simplicity we'll keep all
                   }}
                 />
@@ -497,7 +493,7 @@ export default function UsersTab({
                   type="text"
                   placeholder="Cari kategori..."
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 mb-2"
-                  onChange={(e) => {
+                  onChange={() => {
                     // This would filter the categories list, but for simplicity we'll keep all
                   }}
                 />

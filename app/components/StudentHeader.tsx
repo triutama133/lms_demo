@@ -1,8 +1,8 @@
 "use client";
 import { Children, type ReactNode, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
+import { LogoImage } from './OptimizedImage';
 
 type StudentHeaderProps = {
   extraNavItems?: ReactNode;
@@ -79,7 +79,7 @@ export default function StudentHeader({ extraNavItems, rightSlot }: StudentHeade
     <header className="fixed top-0 left-0 z-10 w-full bg-white/90 shadow">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-3 px-4 py-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3 sm:gap-6">
-          <Image src="/ILMI logo new.png" alt="ILMI Logo" width={48} height={48} className="h-12 w-12 object-contain" />
+          <LogoImage src="/ilmi-logo.png" alt="ILMI Logo" size="md" />
           <span className="text-xl font-bold text-blue-700">LMS</span>
         </div>
 

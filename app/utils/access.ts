@@ -33,7 +33,8 @@ export async function getCourseCategoryIds(courseId: string): Promise<string[] |
     if (isTableMissing(error)) return null; // no restriction configured
     throw error;
   }
-  return data?.categories || [];
+  const categories = data?.categories || [];
+  return categories;
 }
 
 export async function isCourseAccessibleByUser(params: {

@@ -12,14 +12,12 @@ interface CoursesTabProps {
   coursesPerPageOptions: number[];
   selectedCourseIds: string[];
   selectedCourseLabel: string;
-  courseAppliedSearch: string;
   searchCourse: string;
   courseTotalPages: number;
   teacherOptions: User[];
   courseForm: { title: string; description: string; teacher_id: string };
   courseError: string;
   courseLoading: boolean;
-  courseCatsMap: Record<string, string[]>;
   categories: Category[];
   showCourseCatsModal: boolean;
   showParticipantsModal: boolean;
@@ -69,14 +67,12 @@ export default function CoursesTab({
   coursesPerPageOptions,
   selectedCourseIds,
   selectedCourseLabel,
-  courseAppliedSearch,
   searchCourse,
   courseTotalPages,
   teacherOptions,
   courseForm,
   courseError,
   courseLoading,
-  courseCatsMap,
   categories,
   showCourseCatsModal,
   showParticipantsModal,

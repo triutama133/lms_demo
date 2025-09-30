@@ -1,13 +1,14 @@
 "use client";
-import Link from 'next/link';
-import Image from 'next/image';
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import AdminHeader from './components/AdminHeader';
 import StatsCards from './components/StatsCards';
 import TabNavigation from './components/TabNavigation';
 import UsersTab from './components/UsersTab';
 import CoursesTab from './components/CoursesTab';
 import CategoriesTab from './components/CategoriesTab';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { LoadingSpinner } from './components/LoadingSpinner';
+import { SkeletonStats, SkeletonTable } from './components/SkeletonLoader';
 
 
 export type UserFiltersState = {
@@ -54,26 +55,17 @@ export type ImportRowIssue = {
   row: Record<string, unknown>;
 };
 
-const ROLE_OPTIONS = ['admin', 'teacher', 'student'] as const;
-
 export type UserSearchField = 'all' | 'name' | 'email' | 'provinsi' | 'category';
 
 const EMPTY_USER_FILTERS: UserFiltersState = { roles: [], provinces: [], categories: [] };
-
-// Helper functions
-const buildEmptyCategoryRecord = (ids: string[]) => {
-  return Object.fromEntries(ids.map(id => [id, []]));
-};
 
 export default function AdminDashboard() {
   // Deklarasi state tambahan agar error hilang
   const [selectedLabel, setSelectedLabel] = useState('');
   const [selectedCount, setSelectedCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [courseCurrentPage, setCourseCurrentPage] = useState(1);
   const [courseAppliedSearch, setCourseAppliedSearch] = useState('');
-  const [courseDebouncedSearch, setCourseDebouncedSearch] = useState('');
   const [searchCourse, setSearchCourse] = useState('');
   const [courses, setCourses] = useState<Course[]>([]);
   const [coursesLoading, setCoursesLoading] = useState(false);
@@ -91,7 +83,6 @@ export default function AdminDashboard() {
   const [catError, setCatError] = useState('');
   const [catLoading, setCatLoading] = useState(false);
   const [userCatsMap, setUserCatsMap] = useState<Record<string, string[]>>({});
-  const [courseCatsMap, setCourseCatsMap] = useState<Record<string, string[]>>({});
   const [teacherOptions, setTeacherOptions] = useState<User[]>([]);
   const [participants, setParticipants] = useState<User[]>([]);
   const [participantsLoading, setParticipantsLoading] = useState(false);
@@ -133,7 +124,6 @@ export default function AdminDashboard() {
   const [appliedSearch, setAppliedSearch] = useState('');
   const [searchField, setSearchField] = useState<UserSearchField>('all');
   const [appliedSearchField, setAppliedSearchField] = useState<UserSearchField>('all');
-  const [includeSummary, setIncludeSummary] = useState(true);
   // ...existing code...
   // Tambahan deklarasi state dan variabel agar error hilang
   const [roleSummary, setRoleSummary] = useState({ admin: 0, teacher: 0, student: 0 });
@@ -291,9 +281,6 @@ export default function AdminDashboard() {
   const [exportSearchField, setExportSearchField] = useState<UserSearchField>('all');
   const [exportLoading, setExportLoading] = useState(false);
 
-  const allPageSelected = users.length > 0 && selectedUserIds.length === users.length && selectedUserIds.length > 0;
-  const allCoursesSelected = visibleCourses.length > 0 && selectedCourseIds.length === visibleCourses.length && selectedCourseIds.length > 0;
-
   // Missing functions
   const handleSearchSubmit = useCallback(() => {
     setAppliedSearch(searchUser);
@@ -301,9 +288,19 @@ export default function AdminDashboard() {
     setCurrentPage(1);
   }, [searchUser, searchField]);
 
-  const handleLogout = () => {
-    // Implement logout logic
-    console.log('Logout clicked');
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/logout', { method: 'POST' });
+    } catch (error) {
+      console.error('Logout error', error);
+    }
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('lms_user');
+      localStorage.removeItem('user_id');
+      localStorage.removeItem('token');
+      localStorage.removeItem('enrollment_id');
+    }
+    window.location.href = '/lms/login';
   };
 
   const toggleSelectPage = (checked: boolean) => {
@@ -599,10 +596,8 @@ export default function AdminDashboard() {
       setError('');
       setCurrentPage(1);
       setAppliedSearch('');
-      setDebouncedSearch('');
       setCourseCurrentPage(1);
       setCourseAppliedSearch('');
-      setCourseDebouncedSearch('');
       setSearchCourse('');
       try {
         const [userResult] = await Promise.all([
@@ -694,13 +689,6 @@ export default function AdminDashboard() {
       active = false;
     };
   }, [fetchCourses, courseCurrentPage, coursesPerPage, courseAppliedSearch]);
-
-  const lastCourseIdsRef = useRef<string>('');
-
-  // Memoize course IDs to create a stable dependency
-  const courseIdsKey = useMemo(() => {
-    return visibleCourses.map(c => c.id).sort().join(',');
-  }, [visibleCourses]);
 
   // Load category chips for courses in filtered list (visible table rows)
   // NOTE: Categories are now loaded directly with course data, so this useEffect is no longer needed
@@ -834,14 +822,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const toggleUserCat = (id: string) => {
-    setUserCatSet(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
   const saveUserCats = async () => {
     if (!selectedUserForCat) return;
 
@@ -917,18 +897,6 @@ export default function AdminDashboard() {
     setShowCourseCatsModal(true);
   };
 
-  const toggleCourseBulkCat = (id: string) => {
-    setCourseBulkCatSet((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
-
   const saveBulkCourseCats = async () => {
     let targetIds: string[] = [];
     if (courseCatsOption === 'all') {
@@ -983,14 +951,6 @@ export default function AdminDashboard() {
       .map(cat => cat.id);
     setCourseCatSet(new Set(catIds));
     setShowCourseCatModal(true);
-  };
-
-  const toggleCourseCat = (id: string) => {
-    setCourseCatSet(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
   };
 
   const saveCourseCats = async () => {
@@ -1072,14 +1032,6 @@ export default function AdminDashboard() {
       await reloadCategories();
       setShowBulkCatsModal(true);
     }
-  };
-
-  const toggleBulkCat = (id: string) => {
-    setBulkCatSet(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
   };
 
   const saveBulkUserCats = async () => {
@@ -1544,296 +1496,316 @@ export default function AdminDashboard() {
       <AdminHeader onLogout={handleLogout} />
       <main className="min-h-screen bg-gradient-to-br from-blue-100 via-white to-purple-100 px-4 pb-16">
         <div className="mx-auto w-full max-w-6xl space-y-8 pt-10">
-          <StatsCards
-            totalUsers={totalUsers}
-            totalCourses={totalCourses}
-            totalEnrollments={totalEnrollments}
-            roleSummary={roleSummary}
-          />
+          <ErrorBoundary>
+            {loading ? (
+              <SkeletonStats />
+            ) : (
+              <StatsCards
+                totalUsers={totalUsers}
+                totalCourses={totalCourses}
+                totalEnrollments={totalEnrollments}
+                roleSummary={roleSummary}
+              />
+            )}
+          </ErrorBoundary>
 
           <section className="rounded-3xl border border-white/60 bg-white/80 p-8 shadow-xl backdrop-blur">
           {loading ? (
             <div className="flex flex-col items-center justify-center gap-3 py-16 text-slate-500">
-              <span className="text-2xl" aria-hidden>⌛</span>
+              <LoadingSpinner size="lg" />
               <p className="text-sm font-medium">Sedang memuat data terbaru...</p>
             </div>
           ) : error ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-6 py-6 text-center text-red-600 font-semibold">{error}</div>
           ) : (
-            <Fragment>
+            <ErrorBoundary>
               <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
 
               {activeTab === 'users' && (
-                <UsersTab
-                  users={users}
-                  usersLoading={usersLoading}
-                  totalUsers={totalUsers}
-                  currentPage={currentPage}
-                  usersPerPage={usersPerPage}
-                  usersPerPageOptions={usersPerPageOptions}
-                  selectedUserIds={selectedUserIds}
-                  selectedCount={selectedCount}
-                  selectedLabel={selectedLabel}
-                  appliedUserFilters={appliedUserFilters}
-                  userFilters={userFilters}
-                  searchUser={searchUser}
-                  searchField={searchField}
-                  appliedSearchField={appliedSearchField}
-                  categories={categories}
-                  userCatsMap={userCatsMap}
-                  totalPages={totalPages}
-                  showFilterModal={showFilterModal}
-                  showAddModal={showAddModal}
-                  showImportModal={showImportModal}
-                  showEditModal={showEditModal}
-                  showDeleteModal={showDeleteModal}
-                  showBulkCatsModal={showBulkCatsModal}
-                  showUserCatModal={showUserCatModal}
-                  selectedUserForCat={selectedUserForCat}
-                  userCatSet={userCatSet}
-                  editUser={editUser}
-                  deleteUser={deleteUser}
-                  importUsers={importUsers}
-                  importIncompleteRows={importIncompleteRows}
-                  importInvalidValueRows={importInvalidValueRows}
-                  importInvalidRows={importInvalidRows}
-                  importLoading={importLoading}
-                  importError={importError}
-                  importCategories={importCategories}
-                  importCatSearch={importCatSearch}
-                  addForm={addForm}
-                  addLoading={addLoading}
-                  addError={addError}
-                  editForm={editForm}
-                  editLoading={editLoading}
-                  editError={editError}
-                  deleteLoading={deleteLoading}
-                  showEnrollModal={showEnrollModal}
-                  enrollCourses={enrollCourses}
-                  enrollLoading={enrollLoading}
-                  enrollError={enrollError}
-                  selectedEnrollCourseIds={selectedEnrollCourseIds}
-                  onSelectedEnrollCourseIdsChange={setSelectedEnrollCourseIds}
-                  catSearch={catSearch}
-                  bulkCatSet={bulkCatSet}
-                  catsOption={catsOption}
-                  enrollOption={enrollOption}
-                  onEnrollOptionChange={setEnrollOption}
-                  bulkCatsLoading={bulkCatsLoading}
-                  onSearchChange={setSearchUser}
-                  onSearchFieldChange={setSearchField}
-                  onSearchSubmit={handleSearchSubmit}
-                  onFilterModalToggle={() => setShowFilterModal(prev => !prev)}
-                  onAddModalToggle={() => setShowAddModal(prev => !prev)}
-                  onImportModalToggle={() => setShowImportModal(prev => !prev)}
-                  onEditModalToggle={(user) => {
-                    if (user) {
-                      setEditUser(user);
-                      setEditForm({ name: user.name, email: user.email, role: user.role, password: '', provinsi: user.provinsi || '' });
-                      setShowEditModal(true);
-                    } else {
-                      setShowEditModal(false);
-                      setEditUser(null);
-                    }
-                  }}
-                  onDeleteModalToggle={(user) => {
-                    if (user) {
-                      setDeleteUser(user);
-                      setShowDeleteModal(true);
-                    } else {
-                      setShowDeleteModal(false);
-                      setDeleteUser(null);
-                    }
-                  }}
-                  onBulkCatsModalToggle={toggleBulkCatsModal}
-                  onUserCatModalToggle={(user) => {
-                    if (user) {
-                      setSelectedUserForCat(user);
-                      // Initialize userCatSet with current categories for this user
-                      // Categories are now already names in user.categories
-                      const currentCats = user.categories || [];
-                      const catIds = categories
-                        .filter(cat => currentCats.includes(cat.name))
-                        .map(cat => cat.id);
-                      setUserCatSet(new Set(catIds));
-                      setShowUserCatModal(true);
-                    } else {
-                      setShowUserCatModal(false);
-                      setSelectedUserForCat(null);
-                      setUserCatSet(new Set());
-                    }
-                  }}
-                  onImportFileChange={handleImportFileChange}
-                  onAddFormChange={(field, value) => setAddForm(prev => ({ ...prev, [field]: value }))}
-                  onAddUser={handleAddUser}
-                  onUserFiltersChange={setUserFilters}
-                  onAppliedUserFiltersChange={setAppliedUserFilters}
-                  onPageChange={setCurrentPage}
-                  onUsersPerPageChange={(value) => { setUsersPerPage(value); setCurrentPage(1); }}
-                  onSelectAllToggle={toggleSelectPage}
-                  onUserSelectionToggle={toggleUserSelection}
-                  onExportUsers={handleExportUsers}
-                  onEnrollModalOpen={handleOpenEnrollModal}
-                  onEnrollCoursesChange={setEnrollCourses}
-                  onEnrollUsers={async () => {
-                    if (selectedEnrollCourseIds.size === 0) {
-                      setEnrollError('Pilih minimal satu course untuk enroll');
-                      return;
-                    }
-
-                    let targetUserIds: string[] = [];
-                    if (enrollOption === 'selected') {
-                      targetUserIds = selectedUserIds;
-                    } else {
-                      // Enroll all users
-                      try {
-                        const { users } = await fetchAllUsersMatching(appliedSearch, appliedUserFilters);
-                        targetUserIds = users.map(u => u.id);
-                      } catch (err) {
-                        console.error('Gagal mengambil daftar user untuk enroll', err);
-                        setEnrollError('Gagal mengambil daftar user');
-                        return;
-                      }
-                    }
-
-                    if (targetUserIds.length === 0) {
-                      setEnrollError('Tidak ada user yang dipilih untuk enroll');
-                      return;
-                    }
-
-                    setEnrollLoading(true);
-                    setEnrollError('');
-
-                    try {
-                      // Perform bulk enrollment
-                      const enrollPromises = [];
-                      for (const userId of targetUserIds) {
-                        for (const courseId of selectedEnrollCourseIds) {
-                          enrollPromises.push(
-                            fetch('/api/enroll', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ user_id: userId, course_id: courseId }),
-                            })
-                          );
+                <ErrorBoundary>
+                  {usersLoading ? (
+                    <div className="space-y-4">
+                      <SkeletonTable rows={10} columns={5} />
+                    </div>
+                  ) : (
+                    <UsersTab
+                      users={users}
+                      usersLoading={usersLoading}
+                      totalUsers={totalUsers}
+                      currentPage={currentPage}
+                      usersPerPage={usersPerPage}
+                      usersPerPageOptions={usersPerPageOptions}
+                      selectedUserIds={selectedUserIds}
+                      selectedCount={selectedCount}
+                      selectedLabel={selectedLabel}
+                      appliedUserFilters={appliedUserFilters}
+                      userFilters={userFilters}
+                      searchUser={searchUser}
+                      searchField={searchField}
+                      categories={categories}
+                      userCatsMap={userCatsMap}
+                      totalPages={totalPages}
+                      showFilterModal={showFilterModal}
+                      showAddModal={showAddModal}
+                      showImportModal={showImportModal}
+                      showEditModal={showEditModal}
+                      showDeleteModal={showDeleteModal}
+                      showBulkCatsModal={showBulkCatsModal}
+                      showUserCatModal={showUserCatModal}
+                      selectedUserForCat={selectedUserForCat}
+                      userCatSet={userCatSet}
+                      editUser={editUser}
+                      deleteUser={deleteUser}
+                      importUsers={importUsers}
+                      importIncompleteRows={importIncompleteRows}
+                      importInvalidValueRows={importInvalidValueRows}
+                      importInvalidRows={importInvalidRows}
+                      importLoading={importLoading}
+                      importError={importError}
+                      importCategories={importCategories}
+                      importCatSearch={importCatSearch}
+                      addForm={addForm}
+                      addLoading={addLoading}
+                      addError={addError}
+                      editForm={editForm}
+                      editLoading={editLoading}
+                      editError={editError}
+                      deleteLoading={deleteLoading}
+                      showEnrollModal={showEnrollModal}
+                      enrollCourses={enrollCourses}
+                      enrollLoading={enrollLoading}
+                      enrollError={enrollError}
+                      selectedEnrollCourseIds={selectedEnrollCourseIds}
+                      onSelectedEnrollCourseIdsChange={setSelectedEnrollCourseIds}
+                      catSearch={catSearch}
+                      bulkCatSet={bulkCatSet}
+                      catsOption={catsOption}
+                      enrollOption={enrollOption}
+                      onEnrollOptionChange={setEnrollOption}
+                      bulkCatsLoading={bulkCatsLoading}
+                      onSearchChange={setSearchUser}
+                      onSearchFieldChange={setSearchField}
+                      onSearchSubmit={handleSearchSubmit}
+                      onFilterModalToggle={() => setShowFilterModal(prev => !prev)}
+                      onAddModalToggle={() => setShowAddModal(prev => !prev)}
+                      onImportModalToggle={() => setShowImportModal(prev => !prev)}
+                      onEditModalToggle={(user) => {
+                        if (user) {
+                          setEditUser(user);
+                          setEditForm({ name: user.name, email: user.email, role: user.role, password: '', provinsi: user.provinsi || '' });
+                          setShowEditModal(true);
+                        } else {
+                          setShowEditModal(false);
+                          setEditUser(null);
                         }
-                      }
+                      }}
+                      onDeleteModalToggle={(user) => {
+                        if (user) {
+                          setDeleteUser(user);
+                          setShowDeleteModal(true);
+                        } else {
+                          setShowDeleteModal(false);
+                          setDeleteUser(null);
+                        }
+                      }}
+                      onBulkCatsModalToggle={toggleBulkCatsModal}
+                      onUserCatModalToggle={(user) => {
+                        if (user) {
+                          setSelectedUserForCat(user);
+                          // Initialize userCatSet with current categories for this user
+                          // Categories are now already names in user.categories
+                          const currentCats = user.categories || [];
+                          const catIds = categories
+                            .filter(cat => currentCats.includes(cat.name))
+                            .map(cat => cat.id);
+                          setUserCatSet(new Set(catIds));
+                          setShowUserCatModal(true);
+                        } else {
+                          setShowUserCatModal(false);
+                          setSelectedUserForCat(null);
+                          setUserCatSet(new Set());
+                        }
+                      }}
+                      onImportFileChange={handleImportFileChange}
+                      onAddFormChange={(field, value) => setAddForm(prev => ({ ...prev, [field]: value }))}
+                      onAddUser={handleAddUser}
+                      onUserFiltersChange={setUserFilters}
+                      onAppliedUserFiltersChange={setAppliedUserFilters}
+                      onPageChange={setCurrentPage}
+                      onUsersPerPageChange={(value) => { setUsersPerPage(value); setCurrentPage(1); }}
+                      onSelectAllToggle={toggleSelectPage}
+                      onUserSelectionToggle={toggleUserSelection}
+                      onExportUsers={handleExportUsers}
+                      onEnrollModalOpen={handleOpenEnrollModal}
+                      onEnrollUsers={async () => {
+                        if (selectedEnrollCourseIds.size === 0) {
+                          setEnrollError('Pilih minimal satu course untuk enroll');
+                          return;
+                        }
 
-                      const results = await Promise.allSettled(enrollPromises);
-                      const failedCount = results.filter(result => result.status === 'rejected' || (result.status === 'fulfilled' && !result.value.ok)).length;
+                        let targetUserIds: string[] = [];
+                        if (enrollOption === 'selected') {
+                          targetUserIds = selectedUserIds;
+                        } else {
+                          // Enroll all users
+                          try {
+                            const { users } = await fetchAllUsersMatching(appliedSearch, appliedUserFilters);
+                            targetUserIds = users.map(u => u.id);
+                          } catch (err) {
+                            console.error('Gagal mengambil daftar user untuk enroll', err);
+                            setEnrollError('Gagal mengambil daftar user');
+                            return;
+                          }
+                        }
 
-                      if (failedCount > 0) {
-                        setEnrollError(`Gagal enroll ${failedCount} dari ${enrollPromises.length} enrollment`);
-                        showToastNotification(`Gagal enroll ${failedCount} dari ${enrollPromises.length} enrollment.`, 'error');
-                      } else {
-                        setShowEnrollModal(false);
-                        setSelectedEnrollCourseIds(new Set());
-                        showToastNotification(`Berhasil enroll ${targetUserIds.length} user ke ${selectedEnrollCourseIds.size} course.`);
-                        // Refresh data if needed
-                        await reloadUsers({ includeSummary: false });
-                      }
-                    } catch (err) {
-                      console.error('Enroll users error:', err);
-                      setEnrollError('Gagal melakukan enrollment');
-                    } finally {
-                      setEnrollLoading(false);
-                    }
-                  }}
-                  onEditFormChange={(field, value) => setEditForm(prev => ({ ...prev, [field]: value }))}
-                  onEditUser={handleEditUser}
-                  onDeleteUser={handleDeleteUser}
-                  onImportConfirm={handleConfirmImport}
-                  onImportModalClose={() => {
-                    setShowImportModal(false);
-                    resetImportState();
-                  }}
-                  onImportCategoriesChange={setImportCategories}
-                  onImportCatSearchChange={setImportCatSearch}
-                  onCatSearchChange={setCatSearch}
-                  onBulkCatSetChange={setBulkCatSet}
-                  onCatsOptionChange={setCatsOption}
-                  onSaveBulkCats={saveBulkUserCats}
-                  onSaveUserCats={saveUserCats}
-                  onUserCatSetChange={setUserCatSet}
-                />
+                        if (targetUserIds.length === 0) {
+                          setEnrollError('Tidak ada user yang dipilih untuk enroll');
+                          return;
+                        }
+
+                        setEnrollLoading(true);
+                        setEnrollError('');
+
+                        try {
+                          // Perform bulk enrollment
+                          const enrollPromises = [];
+                          for (const userId of targetUserIds) {
+                            for (const courseId of selectedEnrollCourseIds) {
+                              enrollPromises.push(
+                                fetch('/api/enroll', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ user_id: userId, course_id: courseId }),
+                                })
+                              );
+                            }
+                          }
+
+                          const results = await Promise.allSettled(enrollPromises);
+                          const failedCount = results.filter(result => result.status === 'rejected' || (result.status === 'fulfilled' && !result.value.ok)).length;
+
+                          if (failedCount > 0) {
+                            setEnrollError(`Gagal enroll ${failedCount} dari ${enrollPromises.length} enrollment`);
+                            showToastNotification(`Gagal enroll ${failedCount} dari ${enrollPromises.length} enrollment.`, 'error');
+                          } else {
+                            setShowEnrollModal(false);
+                            setSelectedEnrollCourseIds(new Set());
+                            showToastNotification(`Berhasil enroll ${targetUserIds.length} user ke ${selectedEnrollCourseIds.size} course.`);
+                            // Refresh data if needed
+                            await reloadUsers({ includeSummary: false });
+                          }
+                        } catch (err) {
+                          console.error('Enroll users error:', err);
+                          setEnrollError('Gagal melakukan enrollment');
+                        } finally {
+                          setEnrollLoading(false);
+                        }
+                      }}
+                      onEditFormChange={(field, value) => setEditForm(prev => ({ ...prev, [field]: value }))}
+                      onEditUser={handleEditUser}
+                      onDeleteUser={handleDeleteUser}
+                      onImportConfirm={handleConfirmImport}
+                      onImportModalClose={() => {
+                        setShowImportModal(false);
+                        resetImportState();
+                      }}
+                      onImportCategoriesChange={setImportCategories}
+                      onImportCatSearchChange={setImportCatSearch}
+                      onCatSearchChange={setCatSearch}
+                      onBulkCatSetChange={setBulkCatSet}
+                      onCatsOptionChange={setCatsOption}
+                      onSaveBulkCats={saveBulkUserCats}
+                      onSaveUserCats={saveUserCats}
+                      onUserCatSetChange={setUserCatSet}
+                    />
+                  )}
+                </ErrorBoundary>
               )}
 
               {activeTab === 'courses' && (
-                <CoursesTab
-                  visibleCourses={visibleCourses}
-                  coursesLoading={coursesLoading}
-                  totalCourses={totalCourses}
-                  courseCurrentPage={courseCurrentPage}
-                  coursesPerPage={coursesPerPage}
-                  coursesPerPageOptions={coursesPerPageOptions}
-                  selectedCourseIds={selectedCourseIds}
-                  selectedCourseLabel={selectedCourseLabel}
-                  courseAppliedSearch={courseAppliedSearch}
-                  searchCourse={searchCourse}
-                  courseTotalPages={courseTotalPages}
-                  teacherOptions={teacherOptions}
-                  courseForm={courseForm}
-                  courseError={courseError}
-                  courseLoading={courseLoading}
-                  courseCatsMap={courseCatsMap}
-                  categories={categories}
-                  showCourseCatsModal={showCourseCatsModal}
-                  showParticipantsModal={showParticipantsModal}
-                  showAddCourseModal={showAddCourseModal}
-                  selectedCourse={selectedCourse}
-                  participants={participants}
-                  participantsLoading={participantsLoading}
-                  participantsError={participantsError}
-                  courseCatsOption={courseCatsOption}
-                  courseCatSearch={courseCatSearch}
-                  courseBulkCatSet={courseBulkCatSet}
-                  showCourseCatModal={showCourseCatModal}
-                  selectedCourseForCat={selectedCourseForCat}
-                  courseCatSet={courseCatSet}
-                  onSearchChange={setSearchCourse}
-                  onAddCourseClick={() => { setCourseForm({ title: '', description: '', teacher_id: teacherOptions[0]?.id || '' }); setCourseError(''); setShowAddCourseModal(true); }}
-                  onCourseCatsModalOpen={openCourseCatsModal}
-                  onSelectAllCoursesToggle={toggleSelectAllCourses}
-                  onCourseSelectionToggle={toggleCourseSelection}
-                  onCoursesPerPageChange={(value) => { setCoursesPerPage(value); setCourseCurrentPage(1); }}
-                  onCoursePageChange={setCourseCurrentPage}
-                  onParticipantsModalOpen={(course) => { setSelectedCourse(course); setShowParticipantsModal(true); setParticipantsLoading(true); setParticipantsError(''); fetchParticipants(course.id); }}
-                  onCourseFormChange={(field, value) => setCourseForm(prev => ({ ...prev, [field]: value }))}
-                  onCourseSubmit={handleCourseSubmit}
-                  onAddCourseModalClose={() => { setShowAddCourseModal(false); setCourseError(''); }}
-                  onParticipantsModalClose={() => { setShowParticipantsModal(false); setParticipants([]); setSelectedCourse(null); }}
-                  onCourseCatsModalClose={() => { setShowCourseCatsModal(false); setCourseBulkCatSet(new Set()); setCourseCatSearch(''); }}
-                  onSaveBulkCourseCats={saveBulkCourseCats}
-                  onCourseCatsOptionChange={setCourseCatsOption}
-                  onCourseCatSearchChange={setCourseCatSearch}
-                  onCourseBulkCatSetChange={setCourseBulkCatSet}
-                  onCourseCatModalToggle={(course) => {
-                    if (course) {
-                      openCourseCatModal(course);
-                    } else {
-                      setShowCourseCatModal(false);
-                      setSelectedCourseForCat(null);
-                      setCourseCatSet(new Set());
-                    }
-                  }}
-                  onCourseCatSetChange={setCourseCatSet}
-                  onSaveCourseCats={saveCourseCats}
-                />
+                <ErrorBoundary>
+                  {coursesLoading ? (
+                    <div className="space-y-4">
+                      <SkeletonTable rows={8} columns={4} />
+                    </div>
+                  ) : (
+                    <CoursesTab
+                      visibleCourses={visibleCourses}
+                      coursesLoading={coursesLoading}
+                      totalCourses={totalCourses}
+                      courseCurrentPage={courseCurrentPage}
+                      coursesPerPage={coursesPerPage}
+                      coursesPerPageOptions={coursesPerPageOptions}
+                      selectedCourseIds={selectedCourseIds}
+                      selectedCourseLabel={selectedCourseLabel}
+                      searchCourse={searchCourse}
+                      courseTotalPages={courseTotalPages}
+                      teacherOptions={teacherOptions}
+                      courseForm={courseForm}
+                      courseError={courseError}
+                      courseLoading={courseLoading}
+                      categories={categories}
+                      showCourseCatsModal={showCourseCatsModal}
+                      showParticipantsModal={showParticipantsModal}
+                      showAddCourseModal={showAddCourseModal}
+                      selectedCourse={selectedCourse}
+                      participants={participants}
+                      participantsLoading={participantsLoading}
+                      participantsError={participantsError}
+                      courseCatsOption={courseCatsOption}
+                      courseCatSearch={courseCatSearch}
+                      courseBulkCatSet={courseBulkCatSet}
+                      showCourseCatModal={showCourseCatModal}
+                      selectedCourseForCat={selectedCourseForCat}
+                      courseCatSet={courseCatSet}
+                      onSearchChange={setSearchCourse}
+                      onAddCourseClick={() => { setCourseForm({ title: '', description: '', teacher_id: teacherOptions[0]?.id || '' }); setCourseError(''); setShowAddCourseModal(true); }}
+                      onCourseCatsModalOpen={openCourseCatsModal}
+                      onSelectAllCoursesToggle={toggleSelectAllCourses}
+                      onCourseSelectionToggle={toggleCourseSelection}
+                      onCoursesPerPageChange={(value) => { setCoursesPerPage(value); setCourseCurrentPage(1); }}
+                      onCoursePageChange={setCourseCurrentPage}
+                      onParticipantsModalOpen={(course) => { setSelectedCourse(course); setShowParticipantsModal(true); setParticipantsLoading(true); setParticipantsError(''); fetchParticipants(course.id); }}
+                      onCourseFormChange={(field, value) => setCourseForm(prev => ({ ...prev, [field]: value }))}
+                      onCourseSubmit={handleCourseSubmit}
+                      onAddCourseModalClose={() => { setShowAddCourseModal(false); setCourseError(''); }}
+                      onParticipantsModalClose={() => { setShowParticipantsModal(false); setParticipants([]); setSelectedCourse(null); }}
+                      onCourseCatsModalClose={() => { setShowCourseCatsModal(false); setCourseBulkCatSet(new Set()); setCourseCatSearch(''); }}
+                      onSaveBulkCourseCats={saveBulkCourseCats}
+                      onCourseCatsOptionChange={setCourseCatsOption}
+                      onCourseCatSearchChange={setCourseCatSearch}
+                      onCourseBulkCatSetChange={setCourseBulkCatSet}
+                      onCourseCatModalToggle={(course) => {
+                        if (course) {
+                          openCourseCatModal(course);
+                        } else {
+                          setShowCourseCatModal(false);
+                          setSelectedCourseForCat(null);
+                          setCourseCatSet(new Set());
+                        }
+                      }}
+                      onCourseCatSetChange={setCourseCatSet}
+                      onSaveCourseCats={saveCourseCats}
+                    />
+                  )}
+                </ErrorBoundary>
               )}
 
               {activeTab === 'categories' && (
-                <CategoriesTab
-                  categories={categories}
-                  catLoading={catLoading}
-                  catForm={catForm}
-                  catError={catError}
-                  onCatFormChange={(field, value) => setCatForm(prev => ({ ...prev, [field]: value }))}
-                  onSaveCategory={handleSaveCategory}
-                  onEditCategory={(category) => setCatForm({ id: category.id, name: category.name, description: category.description || '' })}
-                  onDeleteCategory={handleDeleteCategory}
-                />
+                <ErrorBoundary>
+                  <CategoriesTab
+                    categories={categories}
+                    catLoading={catLoading}
+                    catForm={catForm}
+                    catError={catError}
+                    onCatFormChange={(field, value) => setCatForm(prev => ({ ...prev, [field]: value }))}
+                    onSaveCategory={handleSaveCategory}
+                    onEditCategory={(category) => setCatForm({ id: category.id, name: category.name, description: category.description || '' })}
+                    onDeleteCategory={handleDeleteCategory}
+                  />
+                </ErrorBoundary>
               )}
-            </Fragment>
+            </ErrorBoundary>
           )}
         </section>
         </div>

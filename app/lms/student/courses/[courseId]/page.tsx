@@ -1,8 +1,10 @@
 "use client";
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import StudentHeader from '../../../../components/StudentHeader';
+import CourseRatings from '../../../../../components/CourseRatings';
+import Modal from '../../../../../components/Modal';
 
 export default function CourseDetailPage() {
   const [progressPercent, setProgressPercent] = useState<number | null>(null);
@@ -14,9 +16,80 @@ export default function CourseDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [enrolled, setEnrolled] = useState(false);
+  const [enrolling, setEnrolling] = useState(false);
+  const [modal, setModal] = useState<{
+    isOpen: boolean;
+    type: 'success' | 'error' | 'warning';
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    type: 'success',
+    title: '',
+    message: ''
+  });
+
+  const checkEnrollmentAndProgress = useCallback(async () => {
+    let user_id = localStorage.getItem('user_id');
+    if (!user_id) {
+      const userData = localStorage.getItem('lms_user');
+      if (userData) {
+        try {
+          const userObj = JSON.parse(userData);
+          user_id = userObj.id;
+        } catch {}
+      }
+    }
+
+    if (!user_id) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // Check enrollment
+      const enrollRes = await fetch(`/api/enroll?user_id=${user_id}`);
+      const enrollData = await enrollRes.json();
+
+      if (enrollData.success && Array.isArray(enrollData.courses)) {
+        const enrolledCourseIds = enrollData.courses.map((c: Course) => c.id);
+        const isEnrolled = enrolledCourseIds.includes(courseId);
+        setEnrolled(isEnrolled);
+
+        // If enrolled, fetch progress
+        if (isEnrolled) {
+          try {
+            const enrollmentRes = await fetch(`/api/enroll/details?user_id=${user_id}&course_id=${courseId}`);
+            const enrollmentData = await enrollmentRes.json();
+
+            if (enrollmentData.success && enrollmentData.enrollment_id) {
+              const progressRes = await fetch(`/api/progress?enrollment_id=${enrollmentData.enrollment_id}&course_id=${courseId}`);
+              const progressData = await progressRes.json();
+
+              if (progressData.success && Array.isArray(progressData.progress)) {
+                const completed = progressData.progress.filter((p: { status: string }) => p.status === 'completed').length;
+                const total = progressData.progress.length;
+                setProgressPercent(total > 0 ? Math.round((completed / total) * 100) : 0);
+              }
+            }
+          } catch (error) {
+            console.error('Error fetching progress:', error);
+          }
+        } else {
+          setProgressPercent(null);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking enrollment and progress:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [courseId]);
 
   useEffect(() => {
     if (!courseId) return;
+
+    // Fetch course data
     fetch(`/api/courses?course_id=${courseId}`)
       .then(res => res.json())
       .then(data => {
@@ -26,36 +99,17 @@ export default function CourseDetailPage() {
         } else {
           setError(data.error || 'Gagal fetch data');
         }
-        setLoading(false);
       })
       .catch(() => {
         setError('Gagal fetch data');
-        setLoading(false);
       });
-    // Cek enrollment dari backend
-    let user_id = localStorage.getItem('user_id');
-    if (!user_id) {
-      const userData = localStorage.getItem('lms_user');
-      if (userData) {
-        try {
-          const userObj = JSON.parse(userData);
-          user_id = userObj.id;
-        } catch {}
-      }
-    }
-    if (user_id) {
-      fetch(`/api/enroll?user_id=${user_id}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.success && Array.isArray(data.courses)) {
-            const enrolledCourseIds = data.courses.map((c: Course) => c.id);
-            setEnrolled(enrolledCourseIds.includes(courseId));
-          }
-        });
-    }
-  }, [courseId]);
+
+    // Check enrollment status and fetch progress if enrolled
+    checkEnrollmentAndProgress();
+  }, [courseId, checkEnrollmentAndProgress]);
 
   const handleEnroll = async () => {
+    // Get user_id from localStorage
     let user_id = localStorage.getItem('user_id');
     if (!user_id) {
       // Fallback: try to get from lms_user
@@ -64,37 +118,71 @@ export default function CourseDetailPage() {
         try {
           const userObj = JSON.parse(userData);
           user_id = userObj.id;
-        } catch {}
-      }
-      // Fetch progress for this enrollment and course
-      const enrollment_id = localStorage.getItem('enrollment_id');
-      if (enrollment_id && courseId) {
-        fetch(`/api/progress?enrollment_id=${enrollment_id}&course_id=${courseId}`)
-          .then(res => res.json())
-          .then(data => {
-            if (data.success && Array.isArray(data.progress)) {
-              const completed = data.progress.filter((p: { status: string }) => p.status === 'completed').length;
-              const total = data.progress.length;
-              setProgressPercent(total > 0 ? Math.round((completed / total) * 100) : 0);
-            }
-          });
+        } catch (error) {
+          console.error('Error parsing user data:', error);
+        }
       }
     }
+
+    console.log('Frontend: user_id from localStorage:', user_id);
+    console.log('Frontend: localStorage lms_user:', localStorage.getItem('lms_user'));
+
     if (!user_id) {
-      alert('User belum login!');
+      setModal({
+        isOpen: true,
+        type: 'warning',
+        title: 'Login Diperlukan',
+        message: 'Silakan login terlebih dahulu untuk mengikuti course.'
+      });
       return;
     }
-    const res = await fetch('/api/enroll', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id, course_id: courseId }),
-    });
-    const data = await res.json();
-    if (data.success && data.enrollment_id) {
-      localStorage.setItem('enrollment_id', data.enrollment_id);
-      setEnrolled(true);
-    } else {
-      alert('Gagal enroll: ' + (data.error || 'Unknown error'));
+
+    setEnrolling(true);
+
+    try {
+      console.log('Frontend: Attempting to enroll user:', user_id, 'in course:', courseId);
+
+      const res = await fetch('/api/enroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id, course_id: courseId }),
+      });
+
+      console.log('Frontend: Response status:', res.status);
+
+      const data = await res.json();
+      console.log('Frontend: Enroll response:', data);
+
+      if (data.success && data.enrollment_id) {
+        localStorage.setItem('enrollment_id', data.enrollment_id);
+
+        // Refresh enrollment and progress data
+        await checkEnrollmentAndProgress();
+
+        setModal({
+          isOpen: true,
+          type: 'success',
+          title: 'Berhasil Enroll!',
+          message: 'Selamat! Anda telah berhasil terdaftar di course ini.'
+        });
+      } else {
+        setModal({
+          isOpen: true,
+          type: 'error',
+          title: 'Gagal Enroll',
+          message: data.error || 'Terjadi kesalahan saat mendaftar course.'
+        });
+      }
+    } catch (error) {
+      console.error('Frontend: Error during enrollment:', error);
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Kesalahan',
+        message: 'Terjadi kesalahan saat enroll. Silakan coba lagi.'
+      });
+    } finally {
+      setEnrolling(false);
     }
   };
 
@@ -124,10 +212,11 @@ export default function CourseDetailPage() {
                     <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
                       {!enrolled ? (
                         <button
-                          className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow transition hover:bg-blue-700"
+                          className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                           onClick={handleEnroll}
+                          disabled={enrolling}
                         >
-                          Enroll Course
+                          {enrolling ? 'Mendaftarkan...' : 'Enroll Course'}
                         </button>
                       ) : (
                         <span className="inline-flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-600">
@@ -199,10 +288,23 @@ export default function CourseDetailPage() {
                 )}
               </section>
 
+              {/* Course Ratings Section */}
+              <section className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-md">
+                <CourseRatings courseId={courseId as string} />
+              </section>
+
             </>
           ) : null}
         </div>
       </main>
+
+      <Modal
+        isOpen={modal.isOpen}
+        onClose={() => setModal(prev => ({ ...prev, isOpen: false }))}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+      />
     </>
   );
 }

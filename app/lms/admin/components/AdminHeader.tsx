@@ -1,5 +1,5 @@
-import Image from 'next/image';
 import Link from 'next/link';
+import { LogoImage } from '../../../components/OptimizedImage';
 
 interface AdminHeaderProps {
   onLogout: () => void;
@@ -10,7 +10,7 @@ export default function AdminHeader({ onLogout }: AdminHeaderProps) {
     <header className="w-full bg-gradient-to-r from-indigo-800 via-blue-700 to-purple-700 shadow-xl">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
         <div className="flex items-center gap-3">
-          <Image src="/ILMI logo new.png" alt="ILMI Logo" width={52} height={52} className="h-12 w-12 object-contain drop-shadow" />
+          <LogoImage src="/ilmi-logo.png" alt="ILMI Logo" size="md" className="drop-shadow" />
           <div>
             <p className="text-[10px] uppercase tracking-[0.45em] text-indigo-200">ILMI LMS</p>
             <h1 className="text-2xl font-semibold text-white">Admin Dashboard</h1>

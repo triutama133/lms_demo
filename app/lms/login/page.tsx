@@ -67,7 +67,7 @@ export default function Login() {
       <section className="max-w-md w-full bg-white/90 rounded-xl shadow-lg p-8">
         <div className="flex flex-col items-center mb-6">
           <Image
-            src="/ILMI logo new.png"
+            src="/ilmi-logo.png"
             alt="ILMI Logo"
             width={144}
             height={144}
