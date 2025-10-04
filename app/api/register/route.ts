@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const captchaResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/verify-captcha`, {
+    const captchaResponse = await fetch('/api/verify-captcha', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: captchaToken }),

@@ -20,16 +20,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const debug = process.env.RECAPTCHA_DEBUG === 'true';
-    if (debug) {
-      try {
-        const masked = typeof token === 'string' ? `${token.slice(0, 6)}...${token.slice(-6)}` : token;
-        console.debug('[reCAPTCHA debug] Received token (masked):', masked);
-      } catch {
-        console.debug('[reCAPTCHA debug] Received token (raw):', token);
-      }
-    }
-
     // Verify with Google reCAPTCHA v2
     const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
       method: 'POST',
@@ -43,14 +33,6 @@ export async function POST(request: Request) {
     });
 
     const data = await response.json();
-
-    if (debug) {
-      try {
-        console.debug('[reCAPTCHA debug] Google verify response:', JSON.stringify(data));
-      } catch {
-        console.debug('[reCAPTCHA debug] Google verify response (raw):', data);
-      }
-    }
 
     if (!data.success) {
       return NextResponse.json(
