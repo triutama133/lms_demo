@@ -14,6 +14,8 @@ export default function Login() {
   const [captchaVerified, setCaptchaVerified] = useState(false);
   const router = useRouter();
   const recaptchaRef = useRef<ReCAPTCHA>(null);
+  // Debug flag controlled by NEXT_PUBLIC_RECAPTCHA_DEBUG
+  const recaptchaDebug = typeof window !== 'undefined' ? (window as unknown as Record<string, string>).__NEXT_PUBLIC_RECAPTCHA_DEBUG === 'true' : false;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -25,8 +27,9 @@ export default function Login() {
     setError('');
     setSuccess(false);
 
-    // Get captcha token for v2
-    const token = recaptchaRef.current?.getValue();
+  // Get captcha token for v2
+  const token = recaptchaRef.current?.getValue();
+  if (recaptchaDebug) console.debug('[reCAPTCHA debug] Token before submit (masked):', token ? `${token.slice(0,6)}...${token.slice(-6)}` : null);
     if (!token) {
       setError('Please complete the captcha verification.');
       setLoading(false);
@@ -121,7 +124,10 @@ export default function Login() {
             <ReCAPTCHA
               ref={recaptchaRef}
               sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || ''}
-              onChange={(token) => setCaptchaVerified(!!token)}
+                onChange={(token) => {
+                  if (recaptchaDebug) console.debug('[reCAPTCHA debug] onChange token (masked):', token ? `${token.slice(0,6)}...${token.slice(-6)}` : null);
+                  setCaptchaVerified(!!token);
+                }}
               onExpired={() => setCaptchaVerified(false)}
               size="compact"
             />
