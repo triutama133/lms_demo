@@ -59,6 +59,12 @@ export type UserSearchField = 'all' | 'name' | 'email' | 'provinsi' | 'category'
 
 const EMPTY_USER_FILTERS: UserFiltersState = { roles: [], provinces: [], categories: [] };
 
+export type CourseFiltersState = {
+  categories: string[];
+};
+
+const EMPTY_COURSE_FILTERS: CourseFiltersState = { categories: [] };
+
 export default function AdminDashboard() {
   // Deklarasi state tambahan agar error hilang
   const [selectedLabel, setSelectedLabel] = useState('');
@@ -67,6 +73,7 @@ export default function AdminDashboard() {
   const [courseCurrentPage, setCourseCurrentPage] = useState(1);
   const [courseAppliedSearch, setCourseAppliedSearch] = useState('');
   const [searchCourse, setSearchCourse] = useState('');
+  const [courseSearchField, setCourseSearchField] = useState<'all' | 'title' | 'teacher'>('all');
   const [courses, setCourses] = useState<Course[]>([]);
   const [coursesLoading, setCoursesLoading] = useState(false);
   const [totalCourses, setTotalCourses] = useState(0);
@@ -110,6 +117,9 @@ export default function AdminDashboard() {
   const [showCourseCatModal, setShowCourseCatModal] = useState(false);
   const [selectedCourseForCat, setSelectedCourseForCat] = useState<Course | null>(null);
   const [courseCatSet, setCourseCatSet] = useState<Set<string>>(new Set());
+
+  // Course filter modal state
+  const [showCourseFilterModal, setShowCourseFilterModal] = useState(false);
 
   const showToastNotification = (message: string, type: 'success' | 'error' = 'success') => {
     setToastMessage(message);
@@ -223,6 +233,8 @@ export default function AdminDashboard() {
   // Deklarasi state dan variabel yang diperlukan agar error hilang
   const [userFilters, setUserFilters] = useState<UserFiltersState>(EMPTY_USER_FILTERS);
   const [appliedUserFilters, setAppliedUserFilters] = useState<UserFiltersState>(EMPTY_USER_FILTERS);
+  const [courseFilters, setCourseFilters] = useState<CourseFiltersState>(EMPTY_COURSE_FILTERS);
+  const [appliedCourseFilters, setAppliedCourseFilters] = useState<CourseFiltersState>(EMPTY_COURSE_FILTERS);
   const [searchUser, setSearchUser] = useState('');
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [users, setUsers] = useState<User[]>([]); // Ganti any dengan tipe User jika tersedia
@@ -273,7 +285,12 @@ export default function AdminDashboard() {
   const [addLoading, setAddLoading] = useState(false);
   const [addError, setAddError] = useState('');
 
-  // Export state variables
+  // Bulk delete states
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+  const [bulkDeleteError, setBulkDeleteError] = useState('');
+
+  // Export states
   const [showExportOptionsModal, setShowExportOptionsModal] = useState(false);
   const [exportOption, setExportOption] = useState<'current' | 'filtered' | 'custom'>('current');
   const [exportFilters, setExportFilters] = useState<UserFiltersState>(EMPTY_USER_FILTERS);
@@ -281,12 +298,23 @@ export default function AdminDashboard() {
   const [exportSearchField, setExportSearchField] = useState<UserSearchField>('all');
   const [exportLoading, setExportLoading] = useState(false);
 
+  // Bulk delete states for courses
+  const [showBulkDeleteCoursesModal, setShowBulkDeleteCoursesModal] = useState(false);
+  const [bulkDeleteCoursesLoading, setBulkDeleteCoursesLoading] = useState(false);
+  const [bulkDeleteCoursesError, setBulkDeleteCoursesError] = useState('');
+
   // Missing functions
   const handleSearchSubmit = useCallback(() => {
     setAppliedSearch(searchUser);
     setAppliedSearchField(searchField);
     setCurrentPage(1);
   }, [searchUser, searchField]);
+
+  const handleCourseSearchSubmit = useCallback(() => {
+    setCourseAppliedSearch(searchCourse);
+    setAppliedCourseFilters(courseFilters);
+    setCourseCurrentPage(1);
+  }, [searchCourse, courseFilters]);
 
   const handleLogout = async () => {
     try {
@@ -376,7 +404,8 @@ export default function AdminDashboard() {
   const fetchCourses = useCallback(async (
     page: number,
     limit: number,
-    search: string
+    search: string,
+    filters: CourseFiltersState = EMPTY_COURSE_FILTERS
   ) => {
     setCoursesLoading(true);
     try {
@@ -384,6 +413,9 @@ export default function AdminDashboard() {
       const keyword = search.trim();
       if (keyword) {
         params.set('search', keyword);
+      }
+      if (filters.categories.length > 0) {
+        params.set('category_ids', filters.categories.join(','));
       }
       const res = await fetch(`/api/admin/courses?${params.toString()}`);
       const data = await res.json();
@@ -423,7 +455,7 @@ export default function AdminDashboard() {
 
   const reloadCourses = useCallback(async () => {
     setCoursesLoading(true); // Show loading state immediately
-    const result = await fetchCourses(courseCurrentPage, coursesPerPage, courseAppliedSearch);
+    const result = await fetchCourses(courseCurrentPage, coursesPerPage, courseAppliedSearch, appliedCourseFilters);
     if (result.success) {
       setCourseTotalPages(result.maxPage); // Update courseTotalPages
     }
@@ -432,7 +464,7 @@ export default function AdminDashboard() {
     }
     setCoursesLoading(false); // Hide loading state after completion
     return result;
-  }, [fetchCourses, courseCurrentPage, coursesPerPage, courseAppliedSearch]);
+  }, [fetchCourses, courseCurrentPage, coursesPerPage, courseAppliedSearch, appliedCourseFilters]);
 
   const reloadUsers = useCallback(
     async (options?: { includeSummary?: boolean }) => {
@@ -553,7 +585,7 @@ export default function AdminDashboard() {
     return users.map((u) => u.id);
   }, [fetchAllUsersMatching]);
 
-  const fetchAllCoursesMatching = useCallback(async (search: string) => {
+  const fetchAllCoursesMatching = useCallback(async (search: string, filters: CourseFiltersState = EMPTY_COURSE_FILTERS) => {
     const collected: Course[] = [];
     const limit = 200;
     let page = 1;
@@ -563,6 +595,9 @@ export default function AdminDashboard() {
       const params = new URLSearchParams({ page: String(page), limit: String(limit) });
       if (keyword) {
         params.set('search', keyword);
+      }
+      if (filters.categories.length > 0) {
+        params.set('category_ids', filters.categories.join(','));
       }
       const res = await fetch(`/api/admin/courses?${params.toString()}`);
       const data = await res.json();
@@ -583,8 +618,8 @@ export default function AdminDashboard() {
     return { courses: collected, total };
   }, []);
 
-  const fetchAllCourseIds = useCallback(async (search: string) => {
-    const { courses } = await fetchAllCoursesMatching(search);
+  const fetchAllCourseIds = useCallback(async (search: string, filters: CourseFiltersState = EMPTY_COURSE_FILTERS) => {
+    const { courses } = await fetchAllCoursesMatching(search, filters);
     return courses.map((course) => course.id);
   }, [fetchAllCoursesMatching]);
 
@@ -676,7 +711,7 @@ export default function AdminDashboard() {
     let active = true;
     setCoursesLoading(true); // Set loading state before fetching
     (async () => {
-      const result = await fetchCourses(courseCurrentPage, coursesPerPage, courseAppliedSearch);
+      const result = await fetchCourses(courseCurrentPage, coursesPerPage, courseAppliedSearch, appliedCourseFilters);
       if (!active) return;
       if (result.success) {
         setCourseTotalPages(result.maxPage); // Update courseTotalPages
@@ -688,7 +723,7 @@ export default function AdminDashboard() {
     return () => {
       active = false;
     };
-  }, [fetchCourses, courseCurrentPage, coursesPerPage, courseAppliedSearch]);
+  }, [fetchCourses, courseCurrentPage, coursesPerPage, courseAppliedSearch, appliedCourseFilters]);
 
   // Load category chips for courses in filtered list (visible table rows)
   // NOTE: Categories are now loaded directly with course data, so this useEffect is no longer needed
@@ -766,12 +801,6 @@ export default function AdminDashboard() {
       setUserCatsMap(newUserCatsMap);
     }
   }, [categories, users]);
-
-  // Update courseAppliedSearch when searchCourse changes
-  useEffect(() => {
-    setCourseAppliedSearch(searchCourse);
-    setCourseCurrentPage(1); // Reset to first page when search changes
-  }, [searchCourse]);
 
   // Set visibleCourses to courses (similar to how users work)
   useEffect(() => {
@@ -901,7 +930,7 @@ export default function AdminDashboard() {
     let targetIds: string[] = [];
     if (courseCatsOption === 'all') {
       try {
-        targetIds = await fetchAllCourseIds(courseAppliedSearch);
+        targetIds = await fetchAllCourseIds(courseAppliedSearch, appliedCourseFilters);
       } catch (err) {
         console.error('Gagal mengambil daftar course', err);
         alert('Gagal mengambil daftar course. Coba lagi.');
@@ -1431,6 +1460,49 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleBulkDeleteModalToggle = () => {
+    if (showBulkDeleteModal) {
+      setShowBulkDeleteModal(false);
+      setBulkDeleteError('');
+    } else {
+      setShowBulkDeleteModal(true);
+      setBulkDeleteError('');
+    }
+  };
+
+  const handleBulkDeleteUsers = async () => {
+    if (selectedUserIds.length === 0) return;
+
+    setBulkDeleteLoading(true);
+    setBulkDeleteError('');
+
+    try {
+      const res = await fetch('/api/users/bulk-delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_ids: selectedUserIds }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setShowBulkDeleteModal(false);
+        setSelectedUserIds([]);
+        setSelectedCount(0);
+        setSelectedLabel('');
+        await reloadUsers({ includeSummary: true });
+        showToastNotification(`Berhasil menghapus ${selectedUserIds.length} user.`);
+      } else {
+        setBulkDeleteError(data.error || 'Gagal menghapus user');
+      }
+    } catch (err) {
+      console.error('Bulk delete users error:', err);
+      setBulkDeleteError('Gagal menghapus user');
+    } finally {
+      setBulkDeleteLoading(false);
+    }
+  };
+
   const fetchParticipants = async (courseId: string) => {
     try {
       setParticipantsLoading(true);
@@ -1449,6 +1521,38 @@ export default function AdminDashboard() {
       setParticipantsError('Gagal memuat peserta');
     } finally {
       setParticipantsLoading(false);
+    }
+  };
+
+  const handleBulkDeleteCourses = async () => {
+    if (selectedCourseIds.length === 0) return;
+
+    setBulkDeleteCoursesLoading(true);
+    setBulkDeleteCoursesError('');
+
+    try {
+      const res = await fetch('/api/admin/courses', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ course_ids: selectedCourseIds }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setShowBulkDeleteCoursesModal(false);
+        setSelectedCourseIds([]);
+        setSelectedCourseLabel('');
+        await reloadCourses();
+        showToastNotification(`Berhasil menghapus ${selectedCourseIds.length} course.`);
+      } else {
+        setBulkDeleteCoursesError(data.error || 'Gagal menghapus course');
+      }
+    } catch (err) {
+      console.error('Bulk delete courses error:', err);
+      setBulkDeleteCoursesError('Gagal menghapus course');
+    } finally {
+      setBulkDeleteCoursesLoading(false);
     }
   };
 
@@ -1609,8 +1713,10 @@ export default function AdminDashboard() {
                         }
                       }}
                       onBulkCatsModalToggle={toggleBulkCatsModal}
-                      onUserCatModalToggle={(user) => {
+                      onUserCatModalToggle={async (user) => {
                         if (user) {
+                          // Reload categories to ensure we have the latest data
+                          await reloadCategories();
                           setSelectedUserForCat(user);
                           // Initialize userCatSet with current categories for this user
                           // Categories are now already names in user.categories
@@ -1717,6 +1823,13 @@ export default function AdminDashboard() {
                       onSaveBulkCats={saveBulkUserCats}
                       onSaveUserCats={saveUserCats}
                       onUserCatSetChange={setUserCatSet}
+                      showBulkDeleteModal={showBulkDeleteModal}
+                      showExportOptionsModal={showExportOptionsModal}
+                      bulkDeleteLoading={bulkDeleteLoading}
+                      bulkDeleteError={bulkDeleteError}
+                      onBulkDeleteModalToggle={handleBulkDeleteModalToggle}
+                      onBulkDeleteUsers={handleBulkDeleteUsers}
+                      EMPTY_USER_FILTERS={EMPTY_USER_FILTERS}
                     />
                   )}
                 </ErrorBoundary>
@@ -1739,6 +1852,7 @@ export default function AdminDashboard() {
                       selectedCourseIds={selectedCourseIds}
                       selectedCourseLabel={selectedCourseLabel}
                       searchCourse={searchCourse}
+                      courseSearchField={courseSearchField}
                       courseTotalPages={courseTotalPages}
                       teacherOptions={teacherOptions}
                       courseForm={courseForm}
@@ -1758,7 +1872,15 @@ export default function AdminDashboard() {
                       showCourseCatModal={showCourseCatModal}
                       selectedCourseForCat={selectedCourseForCat}
                       courseCatSet={courseCatSet}
+                      showBulkDeleteModal={showBulkDeleteCoursesModal}
+                      bulkDeleteLoading={bulkDeleteCoursesLoading}
+                      bulkDeleteError={bulkDeleteCoursesError}
+                      appliedCourseFilters={appliedCourseFilters}
+                      courseFilters={courseFilters}
+                      showCourseFilterModal={showCourseFilterModal}
                       onSearchChange={setSearchCourse}
+                      onSearchFieldChange={setCourseSearchField}
+                      onSearchSubmit={handleCourseSearchSubmit}
                       onAddCourseClick={() => { setCourseForm({ title: '', description: '', teacher_id: teacherOptions[0]?.id || '' }); setCourseError(''); setShowAddCourseModal(true); }}
                       onCourseCatsModalOpen={openCourseCatsModal}
                       onSelectAllCoursesToggle={toggleSelectAllCourses}
@@ -1786,6 +1908,12 @@ export default function AdminDashboard() {
                       }}
                       onCourseCatSetChange={setCourseCatSet}
                       onSaveCourseCats={saveCourseCats}
+                      onBulkDeleteModalToggle={() => setShowBulkDeleteCoursesModal(!showBulkDeleteCoursesModal)}
+                      onBulkDeleteCourses={handleBulkDeleteCourses}
+                      onCourseFiltersChange={setCourseFilters}
+                      onAppliedCourseFiltersChange={setAppliedCourseFilters}
+                      onCourseFilterModalToggle={() => setShowCourseFilterModal(!showCourseFilterModal)}
+                      EMPTY_COURSE_FILTERS={EMPTY_COURSE_FILTERS}
                     />
                   )}
                 </ErrorBoundary>

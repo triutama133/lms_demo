@@ -8,8 +8,8 @@ const nextConfig: NextConfig = {
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     // Define image sizes for different breakpoints
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-    // Allow images from Google Cloud Storage (for uploaded content)
-    domains: ['storage.googleapis.com', 'firebasestorage.googleapis.com'],
+    // Allow images from Supabase Storage (for uploaded content)
+    domains: ['*.supabase.co', '*.supabase.in'],
     // Enable image optimization for local images
     unoptimized: false,
   },

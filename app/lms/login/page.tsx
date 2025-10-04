@@ -2,15 +2,18 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import ReCAPTCHA from 'react-google-recaptcha';
 
 export default function Login() {
   const [form, setForm] = useState({ email: '', password: '', role: 'student' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [captchaVerified, setCaptchaVerified] = useState(false);
   const router = useRouter();
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -21,17 +24,30 @@ export default function Login() {
     setLoading(true);
     setError('');
     setSuccess(false);
+
+    // Get captcha token for v2
+    const token = recaptchaRef.current?.getValue();
+    if (!token) {
+      setError('Please complete the captcha verification.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, captchaToken: token }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
         setSuccess(true);
         setForm({ email: '', password: '', role: 'student' });
+        // Reset captcha
+        recaptchaRef.current?.reset();
+        setCaptchaVerified(false);
+
         // Simpan user ke localStorage dan redirect sesuai role
         if (data.user) {
           console.debug('login response user:', data.user);
@@ -55,9 +71,15 @@ export default function Login() {
         }
       } else {
         setError(data.error || 'Gagal login');
+        // Reset captcha on error
+        recaptchaRef.current?.reset();
+        setCaptchaVerified(false);
       }
     } catch {
       setError('Terjadi kesalahan.');
+      // Reset captcha on error
+      recaptchaRef.current?.reset();
+      setCaptchaVerified(false);
     }
     setLoading(false);
   };
@@ -93,7 +115,19 @@ export default function Login() {
               <option value="admin">Admin</option>
             </select>
           </div>
-          <button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg shadow-md transition-all mt-2">
+
+          {/* reCAPTCHA */}
+          <div className="flex justify-center">
+            <ReCAPTCHA
+              ref={recaptchaRef}
+              sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || ''}
+              onChange={(token) => setCaptchaVerified(!!token)}
+              onExpired={() => setCaptchaVerified(false)}
+              size="compact"
+            />
+          </div>
+
+          <button type="submit" disabled={loading || !captchaVerified} className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-2 rounded-lg shadow-md transition-all mt-2">
             {loading ? 'Login...' : 'Login'}
           </button>
         </form>

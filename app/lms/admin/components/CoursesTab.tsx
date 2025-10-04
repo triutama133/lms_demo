@@ -1,6 +1,6 @@
 import { Fragment } from 'react';
 import Link from 'next/link';
-import { Course, User, Category } from '../page';
+import { Course, User, Category, CourseFiltersState } from '../page';
 
 interface CoursesTabProps {
   // State props
@@ -13,6 +13,7 @@ interface CoursesTabProps {
   selectedCourseIds: string[];
   selectedCourseLabel: string;
   searchCourse: string;
+  courseSearchField: 'all' | 'title' | 'teacher';
   courseTotalPages: number;
   teacherOptions: User[];
   courseForm: { title: string; description: string; teacher_id: string };
@@ -33,9 +34,19 @@ interface CoursesTabProps {
   showCourseCatModal: boolean;
   selectedCourseForCat: Course | null;
   courseCatSet: Set<string>;
+  // Bulk delete props
+  showBulkDeleteModal: boolean;
+  bulkDeleteLoading: boolean;
+  bulkDeleteError: string;
+  // Filter props
+  appliedCourseFilters: CourseFiltersState;
+  courseFilters: CourseFiltersState;
+  showCourseFilterModal: boolean;
 
   // Event handlers
   onSearchChange: (value: string) => void;
+  onSearchFieldChange: (value: 'all' | 'title' | 'teacher') => void;
+  onSearchSubmit: () => void;
   onAddCourseClick: () => void;
   onCourseCatsModalOpen: () => void;
   onSelectAllCoursesToggle: (checked: boolean) => void;
@@ -56,6 +67,14 @@ interface CoursesTabProps {
   onCourseCatModalToggle: (course: Course | null) => void;
   onCourseCatSetChange: (set: Set<string>) => void;
   onSaveCourseCats: () => Promise<void>;
+  // Bulk delete handlers
+  onBulkDeleteModalToggle: () => void;
+  onBulkDeleteCourses: () => Promise<void>;
+  // Filter handlers
+  onCourseFiltersChange: (filters: CourseFiltersState) => void;
+  onAppliedCourseFiltersChange: (filters: CourseFiltersState) => void;
+  onCourseFilterModalToggle: () => void;
+  EMPTY_COURSE_FILTERS: CourseFiltersState;
 }
 
 export default function CoursesTab({
@@ -68,6 +87,7 @@ export default function CoursesTab({
   selectedCourseIds,
   selectedCourseLabel,
   searchCourse,
+  courseSearchField,
   courseTotalPages,
   teacherOptions,
   courseForm,
@@ -87,7 +107,14 @@ export default function CoursesTab({
   showCourseCatModal,
   selectedCourseForCat,
   courseCatSet,
+  showBulkDeleteModal,
+  bulkDeleteLoading,
+  bulkDeleteError,
+  courseFilters,
+  showCourseFilterModal,
   onSearchChange,
+  onSearchFieldChange,
+  onSearchSubmit,
   onAddCourseClick,
   onCourseCatsModalOpen,
   onSelectAllCoursesToggle,
@@ -107,6 +134,12 @@ export default function CoursesTab({
   onCourseCatModalToggle,
   onCourseCatSetChange,
   onSaveCourseCats,
+  onBulkDeleteModalToggle,
+  onBulkDeleteCourses,
+  onCourseFiltersChange,
+  onAppliedCourseFiltersChange,
+  onCourseFilterModalToggle,
+  EMPTY_COURSE_FILTERS,
 }: CoursesTabProps) {
   const allCoursesSelected = visibleCourses.length > 0 && selectedCourseIds.length === visibleCourses.length && selectedCourseIds.length > 0;
 
@@ -117,32 +150,86 @@ export default function CoursesTab({
           <h2 className="text-3xl font-bold text-slate-900">Manajemen Course</h2>
           <p className="text-sm text-slate-500">Pantau materi, pengajar, dan jumlah peserta dalam setiap course.</p>
         </div>
-        <div className="flex flex-col gap-2 md:items-end">
+        <div className="flex flex-col gap-4 md:items-end">
+          {/* Search and Filter Section */}
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-3">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2">
+              <div className="relative md:w-80">
+                <input
+                  type="text"
+                  placeholder="Cari course..."
+                  className="w-full rounded-xl border border-slate-200 bg-white/90 px-4 py-2.5 text-sm shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                  value={searchCourse}
+                  onChange={(e) => onSearchChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      onSearchSubmit();
+                    }
+                  }}
+                />
+                <span className="pointer-events-none absolute right-4 top-1/2 hidden -translate-y-1/2 text-slate-400 md:inline">⌕</span>
+              </div>
+              <select
+                value={courseSearchField}
+                onChange={(e) => onSearchFieldChange(e.target.value as 'all' | 'title' | 'teacher')}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                title="Pilih field yang akan dicari"
+              >
+                <option value="all">Semua</option>
+                <option value="title">Judul</option>
+                <option value="teacher">Pengajar</option>
+              </select>
+              <button
+                onClick={onSearchSubmit}
+                className="rounded-lg bg-purple-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                title="Cari course berdasarkan kriteria yang dipilih"
+              >
+                Cari
+              </button>
+              <button
+                onClick={onCourseFilterModalToggle}
+                className="rounded-lg bg-slate-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                title="Filter course"
+              >
+                Filter
+              </button>
+            </div>
+          </div>
+
+          {/* Action Buttons Section */}
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-end md:gap-3">
-            <input
-              type="text"
-              placeholder="Cari course berdasarkan judul atau pengajar..."
-              className="w-full rounded-xl border border-slate-200 bg-white/90 px-4 py-2.5 text-sm shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200 md:w-72"
-              value={searchCourse}
-              onChange={(e) => onSearchChange(e.target.value)}
-            />
             <button
-              className="rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow transition hover:from-purple-600 hover:to-indigo-600 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 px-4 py-2.5 text-sm font-semibold text-white shadow transition hover:from-purple-600 hover:to-indigo-600 disabled:cursor-not-allowed disabled:opacity-60"
               onClick={onAddCourseClick}
               disabled={teacherOptions.length === 0}
-            >Buat Course</button>
+            >
+              Buat Course
+            </button>
             <button
-              className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 text-sm font-semibold text-white shadow transition hover:from-emerald-600 hover:to-teal-600 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2.5 text-sm font-semibold text-white shadow transition hover:from-emerald-600 hover:to-teal-600 disabled:cursor-not-allowed disabled:opacity-60"
               onClick={onCourseCatsModalOpen}
               disabled={totalCourses === 0}
-            >Kategori</button>
+            >
+              Kategori
+            </button>
+            <button
+              className="rounded-xl bg-gradient-to-r from-red-500 to-pink-500 px-4 py-2.5 text-sm font-semibold text-white shadow transition hover:from-red-600 hover:to-pink-600 disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={onBulkDeleteModalToggle}
+              disabled={selectedCourseIds.length === 0}
+            >
+              Hapus ({selectedCourseIds.length})
+            </button>
           </div>
-          <span className="inline-flex items-center self-start rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-xs font-semibold text-purple-600 md:self-end">
-            Total {totalCourses} course
-          </span>
-          <span className="inline-flex items-center self-start rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 md:self-end">
-            {selectedCourseLabel}
-          </span>
+
+          {/* Status Badges */}
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-end md:gap-3">
+            <span className="inline-flex items-center self-start rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-xs font-semibold text-purple-600 md:self-end">
+              Total {totalCourses} course
+            </span>
+            <span className="inline-flex items-center self-start rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 md:self-end">
+              {selectedCourseLabel}
+            </span>
+          </div>
         </div>
       </div>
       <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-lg">
@@ -486,6 +573,105 @@ export default function CoursesTab({
                 >{courseLoading ? 'Menyimpan...' : 'Simpan Course'}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Modal */}
+      {showBulkDeleteModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="mb-4 text-lg font-bold text-red-700">Konfirmasi Hapus Course</h2>
+            <p className="mb-4 text-gray-700">
+              Yakin ingin menghapus <span className="font-semibold text-red-700">{selectedCourseIds.length} course</span> yang dipilih?
+            </p>
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-700 font-medium mb-2">Data yang akan dihapus:</p>
+              <ul className="text-sm text-red-600 space-y-1">
+                <li>• Semua enrollment dan progress siswa</li>
+                <li>• Semua rating dan feedback</li>
+                <li>• Semua materi dan file terkait</li>
+                <li>• Semua assignment dan tugas</li>
+              </ul>
+            </div>
+            {bulkDeleteError && (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+                {bulkDeleteError}
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                onClick={onBulkDeleteModalToggle}
+                disabled={bulkDeleteLoading}
+              >Batal</button>
+              <button
+                type="button"
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                onClick={onBulkDeleteCourses}
+                disabled={bulkDeleteLoading}
+              >{bulkDeleteLoading ? 'Menghapus...' : 'Ya, Hapus'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Course Filter Modal */}
+      {showCourseFilterModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-slate-800">Filter Course</h3>
+              <p className="text-sm text-slate-600">Pilih kategori untuk memfilter course</p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Kategori</label>
+                <div className="max-h-48 overflow-y-auto space-y-2">
+                  {categories.map((category) => (
+                    <label key={category.id} className="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        checked={courseFilters.categories.includes(category.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            onCourseFiltersChange({ ...courseFilters, categories: [...courseFilters.categories, category.id] });
+                          } else {
+                            onCourseFiltersChange({ ...courseFilters, categories: courseFilters.categories.filter(c => c !== category.id) });
+                          }
+                        }}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-slate-700">{category.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex space-x-3">
+              <button
+                onClick={() => {
+                  onCourseFiltersChange(EMPTY_COURSE_FILTERS);
+                  onAppliedCourseFiltersChange(EMPTY_COURSE_FILTERS);
+                  onCourseFilterModalToggle();
+                }}
+                className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                Reset
+              </button>
+              <button
+                onClick={() => {
+                  onAppliedCourseFiltersChange(courseFilters);
+                  onCourseFilterModalToggle();
+                }}
+                className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                Terapkan
+              </button>
+            </div>
           </div>
         </div>
       )}

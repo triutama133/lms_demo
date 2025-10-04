@@ -14,24 +14,69 @@ export async function GET(request: Request) {
   // Ambil user id dari query (atau session, jika sudah ada auth)
   const { searchParams } = new URL(request.url);
   const teacherId = searchParams.get('teacher_id');
-  if (!teacherId) {
-    return NextResponse.json({ success: false, error: 'Teacher ID wajib diisi.' }, { status: 400 });
-  }
-  if (payload.role === 'teacher' && payload.sub !== teacherId) {
-    return authErrorResponse(new Error('Forbidden'));
+
+  // Jika admin, izinkan akses ke semua courses atau courses teacher tertentu
+  // Jika teacher, hanya boleh akses courses sendiri
+  let queryTeacherId = teacherId;
+  if (payload.role === 'admin') {
+    // Admin bisa melihat semua courses jika tidak specify teacher_id
+    // Atau courses teacher tertentu jika teacher_id disediakan
+    queryTeacherId = teacherId || null; // null berarti ambil semua courses
+  } else {
+    // Teacher hanya boleh akses courses sendiri
+    if (!teacherId || payload.sub !== teacherId) {
+      return authErrorResponse(new Error('Forbidden'));
+    }
+    queryTeacherId = teacherId;
   }
 
-  // Ambil courses yang dibuat oleh teacher, beserta jumlah peserta yang enroll
-  const { data: courses, error: coursesError } = await supabase
+  // Ambil courses berdasarkan teacher_id (atau semua jika admin dan teacherId null)
+  let courseQuery = supabase
     .from('courses')
-    .select('id, title, description, categories, created_at, enrollments:enrollments(count)')
-    .eq('teacher_id', teacherId);
+    .select('id, title, description, categories, created_at, teacher_id');
+
+  if (queryTeacherId) {
+    courseQuery = courseQuery.eq('teacher_id', queryTeacherId);
+  }
+
+  const { data: courses, error: coursesError } = await courseQuery;
   if (coursesError) {
     return NextResponse.json({ success: false, error: coursesError.message }, { status: 500 });
   }
 
+  // Get enrolled count for each course
+  const courseIds = courses?.map((c: { id: string }) => c.id) || [];
+  let enrolledMap: Record<string, number> = {};
+  if (courseIds.length > 0) {
+    const { data: enrollmentData, error: enrollmentError } = await supabase
+      .from('enrollments')
+      .select('course_id')
+      .in('course_id', courseIds);
+    if (enrollmentError) {
+      return NextResponse.json({ success: false, error: enrollmentError.message }, { status: 500 });
+    }
+    enrolledMap = (enrollmentData || []).reduce<Record<string, number>>((acc: Record<string, number>, row: { course_id: string }) => {
+      acc[row.course_id] = (acc[row.course_id] ?? 0) + 1;
+      return acc;
+    }, {});
+  }
+
+  // Get teacher names if admin is viewing all courses
+  const teacherIds = [...new Set(courses?.map((c: { teacher_id: string }) => c.teacher_id).filter(Boolean) || [])];
+  let teacherMap: Record<string, string> = {};
+  if (payload.role === 'admin' && teacherIds.length > 0) {
+    const { data: teacherData, error: teacherError } = await supabase
+      .from('users')
+      .select('id, name')
+      .in('id', teacherIds);
+    if (teacherError) {
+      return NextResponse.json({ success: false, error: teacherError.message }, { status: 500 });
+    }
+    teacherMap = Object.fromEntries((teacherData || []).map((row: { id: string; name: string }) => [row.id, row.name]));
+  }
+
   // Get all unique category IDs from all courses
-  const allCategoryIds = [...new Set((courses || []).flatMap((c) => c.categories || []).filter(Boolean))];
+  const allCategoryIds = [...new Set((courses || []).flatMap((c: { categories?: string[] }) => c.categories || []).filter(Boolean))];
   let categoryMap: Record<string, string> = {};
   if (allCategoryIds.length > 0) {
     const { data: categoryData, error: categoryError } = await supabase
@@ -41,17 +86,16 @@ export async function GET(request: Request) {
     if (categoryError) {
       return NextResponse.json({ success: false, error: categoryError.message }, { status: 500 });
     }
-    categoryMap = Object.fromEntries((categoryData || []).map((row) => [row.id, row.name]));
+    categoryMap = Object.fromEntries((categoryData || []).map((row: { id: string; name: string }) => [row.id, row.name]));
   }
 
   // Map enrolled_count ke setiap course
-  type Course = { id: string; title: string; description: string; categories?: string[]; created_at: string; enrollments?: Array<{ count: number }> };
+  type Course = { id: string; title: string; description: string; categories?: string[]; created_at: string; teacher_id: string };
   const coursesWithCount = Array.isArray(courses)
     ? courses.map((c: Course) => ({
         ...c,
-        enrolled_count: c.enrollments && Array.isArray(c.enrollments) && c.enrollments.length > 0
-          ? c.enrollments[0].count || 0
-          : 0,
+        enrolled_count: enrolledMap[c.id] ?? 0,
+        teacher_name: payload.role === 'admin' ? (teacherMap[c.teacher_id] ?? '-') : undefined,
         categories: (c.categories || []).map((catId) => categoryMap[catId]).filter(Boolean),
       }))
     : [];

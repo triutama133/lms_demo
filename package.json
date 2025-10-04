@@ -9,7 +9,6 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@google-cloud/storage": "^7.17.1",
     "@hello-pangea/dnd": "^18.0.1",
     "@react-pdf-viewer/core": "^3.12.0",
     "@react-pdf-viewer/default-layout": "^3.12.0",
@@ -23,6 +22,7 @@
     "@tiptap/pm": "^3.4.4",
     "@tiptap/react": "^3.4.4",
     "@tiptap/starter-kit": "^3.4.4",
+    "@types/react-google-recaptcha": "^2.1.9",
     "@vercel/analytics": "^1.5.0",
     "autoprefixer": "^10.4.21",
     "bcryptjs": "^3.0.2",
@@ -37,6 +37,7 @@
     "react-dnd": "^16.0.1",
     "react-dnd-html5-backend": "^16.0.1",
     "react-dom": "19.1.0",
+    "react-google-recaptcha": "^3.1.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "uuid": "^13.0.0",

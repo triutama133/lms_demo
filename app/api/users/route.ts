@@ -252,12 +252,41 @@ export async function DELETE(request: Request) {
   // Check if user exists
   const { data: existing, error: checkError } = await supabase
     .from('users')
-    .select('id, name, email')
+    .select('id, name, email, role')
     .eq('id', id)
     .single();
 
   if (checkError || !existing) {
     return NextResponse.json({ success: false, error: 'User tidak ditemukan.' }, { status: 404 });
+  }
+
+  // If user is a teacher, reassign their courses to an admin
+  if (existing.role === 'teacher') {
+    // Find an admin to reassign courses to
+    const { data: adminUser, error: adminError } = await supabase
+      .from('users')
+      .select('id, name')
+      .eq('role', 'admin')
+      .limit(1)
+      .single();
+
+    if (adminError || !adminUser) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Tidak dapat menghapus teacher karena tidak ada admin untuk mengambil alih course. Harap buat admin terlebih dahulu.' 
+      }, { status: 400 });
+    }
+
+    // Reassign all courses from this teacher to the admin
+    const { error: reassignError } = await supabase
+      .from('courses')
+      .update({ teacher_id: adminUser.id })
+      .eq('teacher_id', id);
+
+    if (reassignError) {
+      console.error('Error reassigning courses:', reassignError);
+      return NextResponse.json({ success: false, error: 'Gagal mengalihkan course ke admin.' }, { status: 500 });
+    }
   }
 
   // Delete user

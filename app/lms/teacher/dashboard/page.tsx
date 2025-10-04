@@ -4,12 +4,16 @@ import TeacherHeader from '../../../components/TeacherHeader';
 import { useEffect, useState } from 'react';
 
 export default function TeacherDashboard() {
-  type Course = { id: string; title: string; description: string; enrolled_count?: number; categories?: string[] };
+  type Course = { id: string; title: string; description: string; enrolled_count?: number; categories?: string[]; teacher_name?: string };
   type Category = { id: string; name: string; description?: string };
+  type User = { id: string; name: string; email: string; role: string };
   const [courses, setCourses] = useState<Course[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [teachers, setTeachers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [user, setUser] = useState<User | null>(null);
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>('');
 
   useEffect(() => {
     const userData = typeof window !== 'undefined' ? localStorage.getItem('lms_user') : null;
@@ -18,26 +22,29 @@ export default function TeacherDashboard() {
       setLoading(false);
       return;
     }
-    const user = JSON.parse(userData);
-    if (user.role !== 'teacher') {
-      setError('Akses hanya untuk teacher');
+    const parsedUser = JSON.parse(userData);
+    setUser(parsedUser);
+
+    // Allow both teacher and admin to access this page
+    if (parsedUser.role !== 'teacher' && parsedUser.role !== 'admin') {
+      setError('Akses hanya untuk teacher dan admin');
       setLoading(false);
       return;
     }
 
-    // Fetch courses
-    fetch(`/api/teacher/dashboard?teacher_id=${user.id}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setCourses(data.courses || []);
-        } else {
-          setError(data.error || 'Gagal fetch data');
-        }
-      })
-      .catch(() => {
-        setError('Gagal fetch data');
-      });
+    // If admin, fetch list of teachers for selection
+    if (parsedUser.role === 'admin') {
+      fetch('/api/users?role=teacher&limit=1000&include_summary=false')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setTeachers(data.users || []);
+          }
+        })
+        .catch(() => {
+          // Ignore error for teachers list
+        });
+    }
 
     // Fetch categories
     fetch('/api/categories')
@@ -49,18 +56,78 @@ export default function TeacherDashboard() {
       })
       .catch(() => {
         // Ignore error for categories, course data is more important
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const teacherId = user.role === 'admin' ? selectedTeacherId : user.id;
+    // For admin, if no teacher selected (empty string), it means "All Courses"
+    // If teacherId is empty string for admin, we still want to fetch all courses
+
+    setLoading(true);
+    setError('');
+
+    // Fetch courses
+    const url = user.role === 'admin' && selectedTeacherId ? `/api/teacher/dashboard?teacher_id=${teacherId}` : '/api/teacher/dashboard';
+    fetch(url)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setCourses(data.courses || []);
+        } else {
+          setError(data.error || 'Gagal fetch data');
+        }
+      })
+      .catch(() => {
+        setError('Gagal fetch data');
       })
       .finally(() => {
         setLoading(false);
       });
-  }, []);
+  }, [user, selectedTeacherId]);
+
+  const handleTeacherChange = (teacherId: string) => {
+    setSelectedTeacherId(teacherId);
+  };
 
   return (
     <>
       <TeacherHeader />
       <main className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex flex-col items-center px-4 pt-24">
-        <section className="max-w-3xl w-full bg-white/90 rounded-xl shadow-lg p-8 mt-8">
-        <h1 className="text-2xl font-bold text-purple-700 mb-6 text-center">Teacher Dashboard</h1>
+        <section className="max-w-4xl w-full bg-white/90 rounded-xl shadow-lg p-8 mt-8">
+        <h1 className="text-2xl font-bold text-purple-700 mb-6 text-center">
+          {user?.role === 'admin' ? 'Admin - Teacher Dashboard' : 'Teacher Dashboard'}
+        </h1>
+
+        {user?.role === 'admin' && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <label className="block text-sm font-medium text-blue-700 mb-2">Pilih Teacher untuk Melihat Dashboard:</label>
+            <select
+              value={selectedTeacherId}
+              onChange={(e) => handleTeacherChange(e.target.value)}
+              className="w-full md:w-auto rounded-lg border border-blue-300 px-3 py-2 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            >
+              <option value="">-- Pilih Teacher --</option>
+              <option value="">Semua Courses (Admin View)</option>
+              {teachers.map((teacher) => (
+                <option key={teacher.id} value={teacher.id}>{teacher.name} ({teacher.email})</option>
+              ))}
+            </select>
+            {selectedTeacherId && (
+              <p className="text-xs text-blue-600 mt-1">
+                Menampilkan dashboard untuk: {teachers.find(t => t.id === selectedTeacherId)?.name || 'Unknown'}
+              </p>
+            )}
+            {!selectedTeacherId && (
+              <p className="text-xs text-blue-600 mt-1">
+                Menampilkan semua courses dari semua teacher
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
           <Link href="/lms/teacher/courses/manage" className="bg-blue-100 hover:bg-blue-200 rounded-lg p-6 shadow text-center font-semibold text-blue-700 transition-all">
             Kelola Courses
@@ -69,6 +136,7 @@ export default function TeacherDashboard() {
             Monitoring Progress Siswa
           </Link>
         </div>
+
         {loading ? (
           <div className="text-center text-gray-500">Loading data...</div>
         ) : error ? (
@@ -76,9 +144,19 @@ export default function TeacherDashboard() {
         ) : (
           <>
             <div className="mb-6">
-              <h2 className="text-lg font-bold text-purple-700 mb-2">Courses Anda</h2>
+              <h2 className="text-lg font-bold text-purple-700 mb-2">
+                {user?.role === 'admin' 
+                  ? (selectedTeacherId ? `Courses ${teachers.find(t => t.id === selectedTeacherId)?.name || 'Teacher'}` : 'Semua Courses')
+                  : 'Courses Anda'
+                }
+              </h2>
               {courses.length === 0 ? (
-                <div className="text-gray-500">Belum ada course.</div>
+                <div className="text-gray-500">
+                  {user?.role === 'admin' && !selectedTeacherId 
+                    ? 'Belum ada course.' 
+                    : 'Belum ada course.'
+                  }
+                </div>
               ) : (
                 <ul className="list-disc pl-6">
                   {courses.map((c: Course) => (
@@ -86,6 +164,9 @@ export default function TeacherDashboard() {
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                         <div>
                           <span className="font-semibold text-blue-700">{c.title}</span>
+                          {user?.role === 'admin' && c.teacher_name && (
+                            <span className="ml-2 text-sm text-gray-600">by {c.teacher_name}</span>
+                          )}
                           {c.categories && c.categories.length > 0 && (
                             <div className="inline-flex flex-wrap gap-1 ml-2">
                               {c.categories.map((cat, idx) => (

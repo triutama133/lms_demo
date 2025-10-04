@@ -56,8 +56,8 @@ export async function POST(request: Request) {
   }
 
   const currentCategories = currentCourse?.categories || [];
-  if (!currentCategories.includes(cat.name)) {
-    const updatedCategories = [...currentCategories, cat.name];
+  if (!currentCategories.includes(category_id)) {
+    const updatedCategories = [...currentCategories, category_id];
     const { error } = await supabase
       .from('courses')
       .update({ categories: updatedCategories })
@@ -184,7 +184,7 @@ export async function DELETE(request: Request) {
   }
 
   const currentCategories = currentCourse?.categories || [];
-  const updatedCategories = currentCategories.filter((name: string) => name !== cat.name);
+  const updatedCategories = currentCategories.filter((id: string) => id !== category_id);
 
   const { error } = await supabase
     .from('courses')

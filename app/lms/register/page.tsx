@@ -2,13 +2,16 @@
 "use client";
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import ReCAPTCHA from 'react-google-recaptcha';
 
 export default function Register() {
   const [form, setForm] = useState({ name: '', email: '', password: '', provinsi: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [captchaVerified, setCaptchaVerified] = useState(false);
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -19,21 +22,39 @@ export default function Register() {
     setLoading(true);
     setError('');
     setSuccess(false);
+
+    // Get captcha token
+    const token = recaptchaRef.current?.getValue();
+    if (!token) {
+      setError('Please complete the captcha verification.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, captchaToken: token }),
       });
       const data = await res.json();
       if (data.success) {
         setSuccess(true);
-  setForm({ name: '', email: '', password: '', provinsi: '' });
+        setForm({ name: '', email: '', password: '', provinsi: '' });
+        // Reset captcha
+        recaptchaRef.current?.reset();
+        setCaptchaVerified(false);
       } else {
         setError(data.error || 'Gagal mendaftar.');
+        // Reset captcha on error
+        recaptchaRef.current?.reset();
+        setCaptchaVerified(false);
       }
     } catch {
       setError('Terjadi kesalahan.');
+      // Reset captcha on error
+      recaptchaRef.current?.reset();
+      setCaptchaVerified(false);
     }
     setLoading(false);
   };
@@ -95,7 +116,19 @@ export default function Register() {
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
             <input type="password" id="password" name="password" required value={form.password} onChange={handleChange} className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" />
           </div>
-          <button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg shadow-md transition-all mt-2">
+
+          {/* reCAPTCHA */}
+          <div className="flex justify-center">
+            <ReCAPTCHA
+              ref={recaptchaRef}
+              sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || ''}
+              onChange={(token) => setCaptchaVerified(!!token)}
+              onExpired={() => setCaptchaVerified(false)}
+              size="compact"
+            />
+          </div>
+
+          <button type="submit" disabled={loading || !captchaVerified} className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-2 rounded-lg shadow-md transition-all mt-2">
             {loading ? 'Mendaftar...' : 'Daftar'}
           </button>
         </form>

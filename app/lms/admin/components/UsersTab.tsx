@@ -15,6 +15,7 @@ interface UsersTabProps {
   selectedLabel: string;
   appliedUserFilters: UserFiltersState;
   userFilters: UserFiltersState;
+  EMPTY_USER_FILTERS: UserFiltersState;
   searchUser: string;
   searchField: UserSearchField;
   categories: Category[];
@@ -27,9 +28,11 @@ interface UsersTabProps {
   showImportModal: boolean;
   showEditModal: boolean;
   showDeleteModal: boolean;
+  showBulkDeleteModal: boolean;
   showBulkCatsModal: boolean;
   showEnrollModal: boolean;
   showUserCatModal: boolean;
+  showExportOptionsModal: boolean;
 
   // Form states
   editUser: User | null;
@@ -60,6 +63,8 @@ interface UsersTabProps {
 
   // Delete states
   deleteLoading: boolean;
+  bulkDeleteLoading: boolean;
+  bulkDeleteError: string;
 
     // Enroll handlers
   onEnrollUsers: () => void;
@@ -96,6 +101,8 @@ interface UsersTabProps {
   onUsersPerPageChange: (value: number) => void;
   onSelectAllToggle: (checked: boolean) => void;
   onUserSelectionToggle: (userId: string) => void;
+  onBulkDeleteUsers: () => void;
+  onBulkDeleteModalToggle: () => void;
   onExportUsers: () => void;
 
   // Import handlers
@@ -133,6 +140,7 @@ export default function UsersTab({
   selectedLabel,
   appliedUserFilters,
   userFilters,
+  EMPTY_USER_FILTERS,
   searchUser,
   searchField,
   categories,
@@ -143,6 +151,7 @@ export default function UsersTab({
   showImportModal,
   showEditModal,
   showDeleteModal,
+  showBulkDeleteModal,
   showBulkCatsModal,
   showEnrollModal,
   showUserCatModal,
@@ -164,6 +173,8 @@ export default function UsersTab({
   editLoading,
   editError,
   deleteLoading,
+  bulkDeleteLoading,
+  bulkDeleteError,
   enrollCourses,
   enrollLoading,
   enrollError,
@@ -191,6 +202,8 @@ export default function UsersTab({
   onUsersPerPageChange,
   onSelectAllToggle,
   onUserSelectionToggle,
+  onBulkDeleteUsers,
+  onBulkDeleteModalToggle,
   onExportUsers,
   onEnrollModalOpen,
   onUserCatModalToggle,
@@ -272,6 +285,15 @@ export default function UsersTab({
               onClick={onFilterModalToggle}
               title="Filter user berdasarkan role, provinsi"
             >Filter</button>
+            {appliedUserFilters.roles.length > 0 || appliedUserFilters.provinces.length > 0 || appliedUserFilters.categories.length > 0 ? (
+              <button
+                className="rounded-xl bg-gradient-to-r from-gray-400 to-gray-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:from-gray-600 hover:to-gray-700"
+                onClick={() => onAppliedUserFiltersChange(EMPTY_USER_FILTERS)}
+                title="Hapus semua filter aktif"
+              >
+                Clear Filter
+              </button>
+            ) : null}
             <button
               className="rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:from-blue-600 hover:to-blue-700"
               onClick={onAddModalToggle}
@@ -293,11 +315,11 @@ export default function UsersTab({
               title="Unduh daftar user dalam format Excel"
             >Export User</button>
             <button
-              className="rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:from-fuchsia-600 hover:to-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
-              onClick={onEnrollModalOpen}
-              title="Enroll user terpilih atau semua user ke course"
-              disabled={totalUsers === 0}
-            >Enroll ke Course</button>
+              className="rounded-xl bg-gradient-to-r from-rose-500 to-red-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:from-rose-600 hover:to-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={onBulkDeleteModalToggle}
+              title="Hapus user terpilih secara permanen"
+              disabled={selectedUserIds.length === 0}
+            >Hapus User ({selectedUserIds.length})</button>
           </div>
         </div>
         <div className="rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-xs text-blue-700 shadow-sm md:max-w-xs">
@@ -1237,6 +1259,73 @@ export default function UsersTab({
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
               >
                 Simpan Kategori
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Modal */}
+      {showBulkDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl relative">
+            {bulkDeleteLoading && (
+              <div className="absolute inset-0 bg-white/80 rounded-2xl flex items-center justify-center z-10">
+                <div className="flex flex-col items-center gap-3">
+                  <svg className="animate-spin h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <p className="text-sm font-medium text-slate-700">Menghapus user...</p>
+                </div>
+              </div>
+            )}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-900">Hapus User Massal</h3>
+              <button
+                onClick={onBulkDeleteModalToggle}
+                className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+                disabled={bulkDeleteLoading}
+                aria-label="Tutup modal"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="space-y-4">
+              {bulkDeleteError && (
+                <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                  {bulkDeleteError}
+                </div>
+              )}
+              <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700">
+                <p className="font-medium">Apakah Anda yakin ingin menghapus {selectedUserIds.length} user terpilih?</p>
+                <p className="mt-2 text-xs">
+                  Tindakan ini tidak dapat dibatalkan. Semua data terkait user ini akan dihapus permanen termasuk:
+                </p>
+                <ul className="mt-2 text-xs list-disc list-inside space-y-1">
+                  <li>Enrollment ke course</li>
+                  <li>Progress pembelajaran</li>
+                  <li>Rating dan ulasan</li>
+                  <li>Asosiasi dengan kategori</li>
+                </ul>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={onBulkDeleteModalToggle}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                disabled={bulkDeleteLoading}
+              >
+                Batal
+              </button>
+              <button
+                onClick={onBulkDeleteUsers}
+                disabled={bulkDeleteLoading}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
+              >
+                {bulkDeleteLoading ? 'Menghapus...' : `Hapus ${selectedUserIds.length} User`}
               </button>
             </div>
           </div>

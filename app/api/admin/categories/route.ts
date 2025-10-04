@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../utils/supabaseClient';
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../../utils/auth';
+import { v4 as uuidv4 } from 'uuid';
 
 export async function GET() {
   let auth;
@@ -35,14 +36,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: 'Nama kategori wajib.' }, { status: 400 });
   }
 
-  // Generate simple ID based on timestamp and random number
-  const timestamp = Date.now();
-  const random = Math.floor(Math.random() * 1000);
-  const simpleId = `cat_${timestamp}_${random}`;
+  // Generate UUID for category ID
+  const categoryId = uuidv4();
 
   const { data, error } = await supabase
     .from('categories')
-    .insert({ id: simpleId, name, description })
+    .insert({ id: categoryId, name, description })
     .select();
   const response = NextResponse.json(
     error ? { success: false, error: error.message } : { success: true, category: data?.[0] },

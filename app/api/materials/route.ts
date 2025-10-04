@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Storage } from '@google-cloud/storage';
 import { createClient } from '@supabase/supabase-js';
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../utils/auth';
-
-const bucketName: string = process.env.GCS_BUCKET_NAME || '';
-const credentials = process.env.GCS_CREDENTIALS_JSON ? JSON.parse(process.env.GCS_CREDENTIALS_JSON) : undefined;
-const storage = credentials ? new Storage({ credentials }) : undefined;
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -46,15 +41,12 @@ export async function DELETE(req: NextRequest) {
     if (fetchError || !material) {
       return finalize({ success: false, error: 'Materi tidak ditemukan.' }, { status: 404 });
     }
-    if (material.type === 'pdf' && material.pdf_url && storage) {
+    if (material.type === 'pdf' && material.pdf_url) {
       try {
+        // Extract file path from Supabase Storage URL
         const urlParts = material.pdf_url.split('/');
-        const filePath = urlParts.slice(4).join('/');
-        if (!bucketName) {
-          throw new Error('GCS_BUCKET_NAME env tidak ditemukan');
-        }
-        const bucket = storage.bucket(bucketName);
-        await bucket.file(filePath).delete();
+        const fileName = urlParts[urlParts.length - 1];
+        await supabase.storage.from('materials').remove([fileName]);
       } catch {
         // Intentionally swallow errors when deleting remote file
       }
@@ -109,17 +101,17 @@ export async function PUT(req: NextRequest) {
     }
     const updateData: Record<string, unknown> = { title, description };
     if (pdfFile) {
-      if (!storage) {
-        return finalize({ success: false, error: 'GCS credentials required.' }, { status: 500 });
-      }
       const buffer = Buffer.from(await pdfFile.arrayBuffer());
-      const gcsFileName = `materials/${id}/${Date.now()}_${pdfFile.name}`;
-      const bucket = storage.bucket(bucketName!);
-      const gcsFile = bucket.file(gcsFileName);
-      await gcsFile.save(buffer, {
-        contentType: pdfFile.type,
-      });
-      updateData.pdf_url = `https://storage.googleapis.com/${bucketName}/${gcsFileName}`;
+      const fileName = `${id}_${Date.now()}_${pdfFile.name}`;
+      const { data, error: uploadError } = await supabase.storage
+        .from('materials')
+        .upload(fileName, buffer, {
+          contentType: pdfFile.type,
+        });
+      if (uploadError) {
+        return finalize({ success: false, error: uploadError.message }, { status: 500 });
+      }
+      updateData.pdf_url = data?.path ? supabase.storage.from('materials').getPublicUrl(data.path).data.publicUrl : null;
     }
     const { data, error } = await supabase
       .from('materials')
@@ -177,17 +169,20 @@ export async function POST(req: NextRequest) {
     let insertResult;
 
     if (type === 'pdf') {
-      if (!file || !storage) {
-        return finalize({ error: 'PDF file and GCS credentials required.' }, { status: 400 });
+      if (!file) {
+        return finalize({ error: 'PDF file required.' }, { status: 400 });
       }
       const buffer = Buffer.from(await file.arrayBuffer());
-      const gcsFileName = `materials/${course_id}/${Date.now()}_${file.name}`;
-      const bucket = storage.bucket(bucketName);
-      const gcsFile = bucket.file(gcsFileName);
-      await gcsFile.save(buffer, {
-        contentType: file.type,
-      });
-      const pdf_url = `https://storage.googleapis.com/${bucketName}/${gcsFileName}`;
+      const fileName = `${course_id}_${Date.now()}_${file.name}`;
+      const { data, error: uploadError } = await supabase.storage
+        .from('materials')
+        .upload(fileName, buffer, {
+          contentType: file.type,
+        });
+      if (uploadError) {
+        return finalize({ error: uploadError.message }, { status: 500 });
+      }
+      const pdf_url = data?.path ? supabase.storage.from('materials').getPublicUrl(data.path).data.publicUrl : null;
       insertResult = await supabase
         .from('materials')
         .insert({

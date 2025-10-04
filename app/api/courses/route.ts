@@ -65,6 +65,42 @@ export async function DELETE(request: Request) {
     if (!id) {
       return finalize({ success: false, error: 'Course ID wajib diisi.' }, { status: 400 });
     }
+
+    // Get all materials for this course to delete their files from storage
+    const { data: materials, error: materialsError } = await supabase
+      .from('materials')
+      .select('pdf_url')
+      .eq('course_id', id)
+      .not('pdf_url', 'is', null);
+
+    if (materialsError) {
+      return finalize({ success: false, error: materialsError.message }, { status: 500 });
+    }
+
+    // Delete files from Supabase Storage
+    if (materials && materials.length > 0) {
+      const fileNames = materials
+        .filter(m => m.pdf_url)
+        .map(m => {
+          // Extract filename from Supabase Storage URL
+          // URL format: https://[project].supabase.co/storage/v1/object/public/materials/[filename]
+          const urlParts = m.pdf_url!.split('/');
+          return urlParts[urlParts.length - 1];
+        })
+        .filter(Boolean);
+
+      if (fileNames.length > 0) {
+        const { error: storageError } = await supabase.storage
+          .from('materials')
+          .remove(fileNames);
+
+        if (storageError) {
+          console.error('Error deleting files from storage:', storageError);
+          // Continue with course deletion even if file deletion fails
+        }
+      }
+    }
+
     const { error } = await supabase
       .from('courses')
       .delete()
