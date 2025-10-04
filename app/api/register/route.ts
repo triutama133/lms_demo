@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../utils/supabaseClient';
 import bcrypt from 'bcryptjs';
+import { verifyRecaptchaToken } from '../../../lib/recaptcha';
 
 export async function POST(request: Request) {
   const { name, email, password, provinsi, captchaToken } = await request.json();
@@ -11,15 +12,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const captchaResponse = await fetch('/api/verify-captcha', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: captchaToken }),
-    });
-
-    const captchaData = await captchaResponse.json();
+    const captchaData = await verifyRecaptchaToken(captchaToken);
     if (!captchaData.success) {
-      return NextResponse.json({ success: false, error: 'Captcha verification failed.' }, { status: 400 });
+      console.error('reCAPTCHA verification failed on server:', captchaData);
+      return NextResponse.json({ success: false, error: 'Captcha verification failed.', details: captchaData }, { status: 400 });
     }
   } catch (error) {
     console.error('Captcha verification error:', error);
