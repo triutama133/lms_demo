@@ -1,25 +1,27 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../utils/supabaseClient';
 import bcrypt from 'bcryptjs';
-import { verifyRecaptchaToken } from '../../../lib/recaptcha';
+import { RateLimiterMemory } from 'rate-limiter-flexible';
+
+const rateLimiter = new RateLimiterMemory({
+  keyPrefix: 'register_attempts',
+  points: 5, // Number of attempts
+  duration: 60, // Per 60 seconds (1 minute)
+});
 
 export async function POST(request: Request) {
-  const { name, email, password, provinsi, captchaToken } = await request.json();
+  const { name, email, password, provinsi, captcha } = await request.json();
 
-  // Verify captcha first
-  if (!captchaToken) {
-    return NextResponse.json({ success: false, error: 'Captcha verification required.' }, { status: 400 });
+  // Rate limiting
+  try {
+    await rateLimiter.consume(request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown');
+  } catch {
+    return NextResponse.json({ success: false, error: 'Terlalu banyak percobaan register. Coba lagi nanti.' }, { status: 429 });
   }
 
-  try {
-    const captchaData = await verifyRecaptchaToken(captchaToken);
-    if (!captchaData.success) {
-      console.error('reCAPTCHA verification failed on server:', captchaData);
-      return NextResponse.json({ success: false, error: 'Captcha verification failed.', details: captchaData }, { status: 400 });
-    }
-  } catch (error) {
-    console.error('Captcha verification error:', error);
-    return NextResponse.json({ success: false, error: 'Captcha verification failed.' }, { status: 500 });
+  // Basic captcha validation (in production, use a more secure method)
+  if (!captcha || captcha.length < 4) {
+    return NextResponse.json({ success: false, error: 'Captcha tidak valid.' }, { status: 400 });
   }
 
   // Hash password

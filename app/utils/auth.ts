@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { AuthTokenPayload, signAuthToken, verifyAuthToken } from '../../lib/auth';
 
 const AUTH_COOKIE_NAME = 'lms_token';
-const DEFAULT_COOKIE_MAX_AGE = 60 * 60; // 1 hour
+const DEFAULT_COOKIE_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
 const DEFAULT_REFRESH_THRESHOLD = 10 * 60; // 10 minutes
 
 type RequireAuthResult = {

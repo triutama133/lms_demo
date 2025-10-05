@@ -1,17 +1,22 @@
-
 "use client";
 
 import Link from 'next/link';
-import { useState, useRef } from 'react';
-import ReCAPTCHA from 'react-google-recaptcha';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Captcha from '../../../components/Captcha';
 
 export default function Register() {
   const [form, setForm] = useState({ name: '', email: '', password: '', provinsi: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [captchaVerified, setCaptchaVerified] = useState(false);
-  const recaptchaRef = useRef<ReCAPTCHA>(null);
+  const [captchaValue, setCaptchaValue] = useState('');
+  const router = useRouter();
+
+  // Generate simple math captcha (addition)
+  useEffect(() => {
+    // Not needed for custom captcha
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -23,10 +28,9 @@ export default function Register() {
     setError('');
     setSuccess(false);
 
-    // Get captcha token
-    const token = recaptchaRef.current?.getValue();
-    if (!token) {
-      setError('Please complete the captcha verification.');
+    // Validate captcha (basic check)
+    if (!captchaValue || captchaValue.length < 4) {
+      setError('Captcha belum diisi dengan benar.');
       setLoading(false);
       return;
     }
@@ -35,26 +39,27 @@ export default function Register() {
       const res = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, captchaToken: token }),
+        body: JSON.stringify({ ...form, captcha: captchaValue }),
       });
       const data = await res.json();
       if (data.success) {
         setSuccess(true);
         setForm({ name: '', email: '', password: '', provinsi: '' });
         // Reset captcha
-        recaptchaRef.current?.reset();
-        setCaptchaVerified(false);
+        setCaptchaValue('');
+        // Redirect to login after a short delay
+        setTimeout(() => {
+          router.push('/lms/login');
+        }, 2000);
       } else {
-        setError(data.error || 'Gagal mendaftar.');
+        setError(data.error || 'Gagal register');
         // Reset captcha on error
-        recaptchaRef.current?.reset();
-        setCaptchaVerified(false);
+        setCaptchaValue('');
       }
     } catch {
       setError('Terjadi kesalahan.');
       // Reset captcha on error
-      recaptchaRef.current?.reset();
-      setCaptchaVerified(false);
+      setCaptchaValue('');
     }
     setLoading(false);
   };
@@ -63,7 +68,7 @@ export default function Register() {
     <main className="min-h-screen bg-gradient-to-br from-purple-100 via-white to-blue-100 flex flex-col items-center justify-center px-4 pt-24">
       <section className="max-w-md w-full bg-white/90 rounded-xl shadow-lg p-8">
         <h1 className="text-3xl font-bold text-blue-700 mb-6 text-center">Daftar Akun Baru</h1>
-  <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+        <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap</label>
             <input type="text" id="name" name="name" required value={form.name} onChange={handleChange} className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" />
@@ -117,23 +122,24 @@ export default function Register() {
             <input type="password" id="password" name="password" required value={form.password} onChange={handleChange} className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" />
           </div>
 
-          {/* reCAPTCHA */}
-          <div className="flex justify-center">
-            <ReCAPTCHA
-              ref={recaptchaRef}
-              sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || ''}
-              onChange={(token) => setCaptchaVerified(!!token)}
-              onExpired={() => setCaptchaVerified(false)}
-              size="compact"
-            />
-          </div>
+          <Captcha onChange={setCaptchaValue} />
 
-          <button type="submit" disabled={loading || !captchaVerified} className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-2 rounded-lg shadow-md transition-all mt-2">
-            {loading ? 'Mendaftar...' : 'Daftar'}
+          <button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-2 rounded-lg shadow-md transition-all mt-2 flex items-center justify-center gap-2">
+            {loading ? (
+              <>
+                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Mendaftar...
+              </>
+            ) : (
+              'Daftar'
+            )}
           </button>
         </form>
         {error && <div className="mt-4 text-red-600 text-sm text-center">{error}</div>}
-        {success && <div className="mt-4 text-green-600 text-sm text-center">Pendaftaran berhasil! Silakan cek email untuk verifikasi.</div>}
+        {success && <div className="mt-4 text-green-600 text-sm text-center">Pendaftaran berhasil! Mengarahkan ke halaman login...</div>}
         <div className="mt-6 text-center">
           <span className="text-gray-600 text-sm">Sudah punya akun?</span>{' '}
           <Link href="/lms/login" className="text-blue-600 hover:underline text-sm font-medium">Login</Link>

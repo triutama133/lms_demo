@@ -29,7 +29,7 @@ export async function signAuthToken(payload: {
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setSubject(payload.sub)
     .setIssuedAt()
-    .setExpirationTime(expiresIn ?? process.env.JWT_EXPIRES_IN ?? '1h')
+    .setExpirationTime(expiresIn ?? process.env.JWT_EXPIRES_IN ?? '30d')
     .sign(getSecretKey());
   return token;
 }
