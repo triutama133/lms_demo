@@ -10,7 +10,7 @@ SUPABASE_URL = os.getenv('SUPABASE_URL', 'https://iibsiolneijwmofwimuw.supabase.
 SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlpYnNpb2xuZWlqd21vZndpbXV3Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTk0OTgxNywiZXhwIjoyMDY3NTI1ODE3fQ.YpbCJyYFKMc5jq56chtG_kqgpPnNcDnY5oDwVNWRzDk')
 MINIO_ENDPOINT = os.getenv('MINIO_ENDPOINT', 'http://157.66.35.109:9000').replace('http://', '')
 MINIO_ACCESS_KEY = os.getenv('MINIO_ACCESS_KEY', 'lmsminio')
-MINIO_SECRET_KEY = os.getenv('MINIO_SECRET_KEY', 'lmsminio133133')
+MINIO_SECRET_KEY = os.getenv('MINIO_SECRET_KEY', 'USd6hFLd1Vi2mdl7F4GElw==')
 MINIO_BUCKET = os.getenv('MINIO_BUCKET', 'ilmilms-bucket')
 
 # Connect to Supabase
