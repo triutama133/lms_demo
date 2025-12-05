@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '../../../utils/supabaseClient';
+import { PrismaClient } from '@prisma/client';
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../../utils/auth';
+
+const prisma = new PrismaClient();
 
 export async function GET(request: Request) {
   let auth;
@@ -23,40 +25,32 @@ export async function GET(request: Request) {
   if (!courseId) {
     return finalize({ success: false, error: 'course_id wajib diisi' }, { status: 400 });
   }
-  const { data: course, error: courseError } = await supabase
-    .from('courses')
-    .select('teacher_id')
-    .eq('id', courseId)
-    .single();
-  if (courseError || !course) {
+  const course = await prisma.course.findUnique({
+    where: { id: courseId },
+    select: { teacherId: true }
+  });
+  if (!course) {
     return finalize({ success: false, error: 'Course tidak ditemukan' }, { status: 404 });
   }
-  if (payload.role === 'teacher' && course.teacher_id !== payload.sub) {
+  if (payload.role === 'teacher' && course.teacherId !== payload.sub) {
     return authErrorResponse(new Error('Forbidden'));
   }
 
   // Ambil enrollments untuk course ini
-  const { data: enrollments, error: enrollError } = await supabase
-    .from('enrollments')
-    .select('user_id')
-    .eq('course_id', courseId);
-  if (enrollError) {
-    return finalize({ success: false, error: enrollError.message }, { status: 500 });
-  }
+  const enrollments = await prisma.enrollment.findMany({
+    where: { courseId },
+    select: { userId: true }
+  });
   if (!enrollments || enrollments.length === 0) {
     return finalize({ success: true, participants: [] });
   }
 
   // Ambil data user dari user_id hasil enrollments
-  type Enrollment = { user_id: string };
-  const userIds = (enrollments as Enrollment[]).map((e) => e.user_id);
-  const { data: users, error: userError } = await supabase
-    .from('users')
-    .select('id, name, email')
-    .in('id', userIds);
-  if (userError) {
-    return finalize({ success: false, error: userError.message }, { status: 500 });
-  }
+  const userIds = enrollments.map((e) => e.userId);
+  const users = await prisma.user.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true, name: true, email: true }
+  });
 
   return finalize({ success: true, participants: users });
 }
