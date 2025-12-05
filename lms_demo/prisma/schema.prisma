@@ -1,0 +1,158 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id
+  name      String
+  email     String   @unique
+  role      String
+  provinsi  String?
+  password  String
+  categories String[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  courses         Course[]
+  enrollments     Enrollment[]
+  progress        Progress[]
+  userCategories  UserCategory[]
+  courseRatings   CourseRating[]
+
+  @@map("users")
+}
+
+model Category {
+  id          String   @id
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  userCategories UserCategory[]
+
+  @@map("categories")
+}
+
+model Course {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  teacherId   String   @map("teacher_id")
+  categories  String[]
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  teacher     User         @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  enrollments Enrollment[]
+  progress    Progress[]
+  materials   Material[]
+  courseRatings CourseRating[]
+
+  @@map("courses")
+}
+
+model Enrollment {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  courseId   String   @map("course_id")
+  enrolledAt DateTime @default(now()) @map("enrolled_at")
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@map("enrollments")
+}
+
+model Progress {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  courseId   String    @map("course_id")
+  materialId String    @map("material_id")
+  completed  Boolean   @default(false)
+  completedAt DateTime? @map("completed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId, materialId])
+  @@map("progress")
+}
+
+model UserCategory {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  categoryId String   @map("category_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, categoryId])
+  @@map("user_categories")
+}
+
+model CourseRating {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  courseId  String   @map("course_id")
+  rating    Int
+  review    String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@map("course_ratings")
+}
+
+model Material {
+  id          String   @id @default(uuid())
+  courseId    String?  @map("course_id")
+  title       String
+  content     String?
+  order       Int?     @map("order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  type        String   @default("markdown")
+  pdfUrl      String?  @map("pdf_url")
+  description String?
+
+  // Relations
+  course    Course?           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  sections  MaterialSection[]
+
+  @@map("materials")
+}
+
+model MaterialSection {
+  id         String   @id @default(uuid())
+  materialId String   @map("material_id")
+  title      String
+  content    String
+  order      Int?     @map("order")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@map("material_sections")
+}

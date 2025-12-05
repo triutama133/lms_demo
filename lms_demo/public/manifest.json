@@ -1,0 +1,28 @@
+{
+  "name": "ILMI Learning Management System",
+  "short_name": "ILMI LMS",
+  "description": "Comprehensive Learning Management System for ILMI",
+  "start_url": "/lms/login",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/ilmi-logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/ilmi-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "productivity"],
+  "lang": "id-ID",
+  "dir": "ltr"
+}
