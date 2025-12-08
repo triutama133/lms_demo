@@ -2,14 +2,10 @@ import os
 from supabase import create_client
 import psycopg2
 from psycopg2.extras import execute_values
+from dotenv import load_dotenv
 
-# Hardcoded environment variables
-os.environ['SUPABASE_URL'] = 'https://iibsiolneijwmofwimuw.supabase.co'
-os.environ['SUPABASE_ANON_KEY'] = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlpYnNpb2xuZWlqd21vZndpbXV3Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTk0OTgxNywiZXhwIjoyMDY3NTI1ODE3fQ.YpbCJyYFKMc5jq56chtG_kqgpPnNcDnY5oDwVNWRzDk'
-os.environ['VPS_HOST'] = '157.66.35.109'
-os.environ['VPS_DB'] = 'ilmilms'
-os.environ['VPS_USER'] = 'root'
-os.environ['VPS_PASSWORD'] = 'ilmilms4671133133'
+# Load environment variables from .env file
+load_dotenv()
 
 # Load environment variables for security
 SUPABASE_URL = os.getenv('SUPABASE_URL')

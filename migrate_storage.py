@@ -4,14 +4,35 @@ from minio import Minio
 from minio.error import S3Error
 import requests
 import io
+from dotenv import load_dotenv
 
-# Load environment variables with fallbacks
-SUPABASE_URL = os.getenv('SUPABASE_URL', 'https://iibsiolneijwmofwimuw.supabase.co')
-SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlpYnNpb2xuZWlqd21vZndpbXV3Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTk0OTgxNywiZXhwIjoyMDY3NTI1ODE3fQ.YpbCJyYFKMc5jq56chtG_kqgpPnNcDnY5oDwVNWRzDk')
-MINIO_ENDPOINT = os.getenv('MINIO_ENDPOINT', 'http://157.66.35.109:9000').replace('http://', '')
-MINIO_ACCESS_KEY = os.getenv('MINIO_ACCESS_KEY', 'lmsminio')
-MINIO_SECRET_KEY = os.getenv('MINIO_SECRET_KEY', 'USd6hFLd1Vi2mdl7F4GElw==')
-MINIO_BUCKET = os.getenv('MINIO_BUCKET', 'ilmilms-bucket')
+# Load environment variables from .env file
+load_dotenv()
+
+# Load environment variables (no fallbacks for security)
+SUPABASE_URL = os.getenv('SUPABASE_URL2')
+SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY2')
+MINIO_ENDPOINT = os.getenv('MINIO_ENDPOINT')
+MINIO_ACCESS_KEY = os.getenv('MINIO_ACCESS_KEY')
+MINIO_SECRET_KEY = os.getenv('MINIO_SECRET_KEY')
+MINIO_BUCKET = os.getenv('MINIO_BUCKET')
+
+# Validate required environment variables
+required_vars = [
+    ('SUPABASE_URL2', SUPABASE_URL),
+    ('SUPABASE_ANON_KEY2', SUPABASE_ANON_KEY),
+    ('MINIO_ENDPOINT', MINIO_ENDPOINT),
+    ('MINIO_ACCESS_KEY', MINIO_ACCESS_KEY),
+    ('MINIO_SECRET_KEY', MINIO_SECRET_KEY),
+    ('MINIO_BUCKET', MINIO_BUCKET)
+]
+
+missing_vars = [name for name, value in required_vars if not value]
+if missing_vars:
+    raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
+
+# Clean MINIO_ENDPOINT (remove http:// if present)
+MINIO_ENDPOINT = MINIO_ENDPOINT.replace('http://', '').replace('https://', '')
 
 # Connect to Supabase
 supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
