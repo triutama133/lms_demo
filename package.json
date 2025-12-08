@@ -34,7 +34,7 @@
     "lowlight": "^3.3.0",
     "lucide-react": "^0.544.0",
     "minio": "^8.0.6",
-    "next": "15.5.3",
+    "next": "15.5.7",
     "pdfjs-dist": "^3.11.174",
     "prisma": "^6.18.0",
     "rate-limiter-flexible": "^3.0.4",
@@ -57,7 +57,7 @@
     "@types/xlsx": "^0.0.35",
     "dotenv": "^17.2.2",
     "eslint": "^9",
-    "eslint-config-next": "15.5.3",
+    "eslint-config-next": "15.5.7",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
