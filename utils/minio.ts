@@ -168,9 +168,9 @@ export class MinIOService {
   }
 
   /**
-   * Generate a presigned URL for file access
+   * Generate a signed URL for file access
    */
-  async getPresignedUrl(fileName: string, expiresIn: number = 3600): Promise<string | null> {
+  async getSignedUrl(fileName: string, expiresIn: number = 3600): Promise<string | null> {
     try {
       const command = new GetObjectCommand({
         Bucket: this.bucketName,
