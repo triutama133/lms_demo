@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { authErrorResponse, refreshAuthCookie, requireAuth } from '../../../utils/auth';
 import { isCourseAccessibleByUser } from '../../../utils/access';
-import { MinIOService } from '../../../../utils/minio';
-
-const prisma = new PrismaClient();
+import { storageService } from '../../../../utils/storage';
+import { prisma } from "@/app/utils/supabaseClient";
 
 export async function GET(req: Request) {
   let auth;
@@ -100,7 +98,7 @@ export async function GET(req: Request) {
       title: material.title,
       description: material.description,
       type: material.type,
-      pdf_url: material.pdfUrl ? MinIOService.replaceWithPublicUrl(material.pdfUrl) : null,
+      pdf_url: material.pdfUrl ? storageService.replaceWithPublicUrl(material.pdfUrl) : null,
       content: material.content,
       course_id: material.courseId,
       sections,

@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
 import bcrypt from 'bcryptjs';
+import { prisma } from "@/app/utils/supabaseClient";
 import { v4 as uuidv4 } from 'uuid';
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../../utils/auth';
 

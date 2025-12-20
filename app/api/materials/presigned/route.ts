@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { minIOService, MinIOService } from '../../../../utils/minio';
+import { storageService } from '../../../../utils/storage';
+import { MinIOService } from '../../../../utils/minio';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -11,14 +12,25 @@ export async function GET(req: NextRequest) {
 
   try {
     // Extract filename from URL
-    const fileName = MinIOService.extractFileNameFromUrl(fileUrl);
+    const fileName = storageService.extractFileNameFromUrl(fileUrl);
 
     if (!fileName) {
       return NextResponse.json({ success: false, error: 'Invalid file URL' }, { status: 400 });
     }
 
-    // Generate presigned URL (expires in 1 hour)
-    const presignedUrl = await minIOService.getPresignedUrl(fileName, 3600);
+    // Determine which storage service to use based on URL
+    let presignedUrl: string | null = null;
+    if (fileUrl.includes('supabase.co')) {
+      // Use Supabase storage
+      presignedUrl = await storageService.getSignedUrl(fileName, 3600);
+    } else if (fileUrl.includes('minio') || fileUrl.includes('157.66.35.109')) {
+      // Use MinIO storage for legacy files
+      const minIOService = new MinIOService();
+      presignedUrl = await minIOService.getSignedUrl(fileName, 3600);
+    } else {
+      // Default to current storage service
+      presignedUrl = await storageService.getSignedUrl(fileName, 3600);
+    }
 
     if (!presignedUrl) {
       return NextResponse.json({ success: false, error: 'Failed to generate access URL' }, { status: 500 });

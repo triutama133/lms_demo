@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
-import { authErrorResponse, refreshAuthCookie, requireAuth } from '../../utils/auth';
+import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../utils/auth';
+import { prisma } from "@/app/utils/supabaseClient";
 import { isCourseAccessibleByUser } from '../../utils/access';
 
 type MaterialWithSections = {

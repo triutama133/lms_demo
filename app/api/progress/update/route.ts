@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { authErrorResponse, refreshAuthCookie, requireAuth } from '../../../utils/auth';
-
-const prisma = new PrismaClient();
+import { prisma } from "@/app/utils/supabaseClient";
 
 export async function POST(req: Request) {
   const body = await req.json();

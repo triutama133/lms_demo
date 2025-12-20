@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../../utils/auth';
-import { MinIOService } from '../../../../utils/minio';
+import { prisma } from "@/app/utils/supabaseClient";
+import { storageService } from '../../../../utils/storage';
 
 export async function GET(request: Request) {
   let auth;
@@ -121,7 +119,7 @@ export async function GET(request: Request) {
   // Process materials to replace URLs with public domain
   const processedMaterials = materials.map(material => ({
     ...material,
-    pdfUrl: material.pdfUrl ? MinIOService.replaceWithPublicUrl(material.pdfUrl) : null
+    pdfUrl: material.pdfUrl ? storageService.replaceWithPublicUrl(material.pdfUrl) : null
   }));
 
   // Ambil progress siswa untuk courses teacher

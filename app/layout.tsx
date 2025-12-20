@@ -1,18 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { PWARegistration } from "./components/PWARegistration";
 
-const geistSans = Geist({
+// Using system fonts to avoid Google Fonts download issues
+const geistSans = {
   variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+  className: "",
+};
 
-const geistMono = Geist_Mono({
+const geistMono = {
   variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+  className: "",
+};
 
 export const metadata: Metadata = {
   title: "ILMI LMS",

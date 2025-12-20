@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
 import { NextResponse } from 'next/server';
+import { prisma } from "@/app/utils/supabaseClient";
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../utils/auth';
 
 export async function GET() {

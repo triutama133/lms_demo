@@ -1,15 +1,7 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from "@/app/utils/supabaseClient";
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../../utils/auth';
-import { minIOService } from '../../../../utils/minio';
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+import { storageService } from '../../../../utils/storage';
 
 export async function POST(request: Request) {
   let auth;
@@ -41,11 +33,22 @@ export async function POST(request: Request) {
         return finalize({ success: false, error: 'File PDF tidak valid.' }, { status: 400 });
       }
 
+      // Validate file size (100MB max)
+      const MAX_SIZE = 100 * 1024 * 1024;
+      if (file.size > MAX_SIZE) {
+        return finalize({ success: false, error: 'File terlalu besar. Maksimal 100MB.' }, { status: 400 });
+      }
+
+      // Validate file type
+      if (file.type !== 'application/pdf') {
+        return finalize({ success: false, error: 'Hanya file PDF yang diperbolehkan.' }, { status: 400 });
+      }
+
       // Upload ke MinIO Storage
-      const fileName = `${Date.now()}_${file.name}`;
+      const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
       const fileBuffer = Buffer.from(await file.arrayBuffer());
 
-      const uploadResult = await minIOService.uploadFile(fileBuffer, fileName);
+      const uploadResult = await storageService.uploadFile(fileBuffer, fileName, file.type);
 
       if (!uploadResult.success) {
         return finalize({ success: false, error: uploadResult.error || 'Upload gagal' }, { status: 500 });

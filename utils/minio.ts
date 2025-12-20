@@ -1,12 +1,29 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
+// File upload security constraints
+export const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+export const ALLOWED_FILE_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'video/mp4',
+  'video/webm',
+];
+
+// Validate required environment variables
+if (!process.env.MINIO_ENDPOINT || !process.env.MINIO_ACCESS_KEY || !process.env.MINIO_SECRET_KEY) {
+  throw new Error('MinIO configuration missing: MINIO_ENDPOINT, MINIO_ACCESS_KEY, and MINIO_SECRET_KEY must be set');
+}
+
 const s3Client = new S3Client({
   region: 'us-east-1', // MinIO doesn't require a specific region, but AWS SDK needs one
-  endpoint: process.env.MINIO_ENDPOINT || 'http://157.66.35.109:9000',
+  endpoint: process.env.MINIO_ENDPOINT,
   credentials: {
-    accessKeyId: process.env.MINIO_ACCESS_KEY || 'minioadmin',
-    secretAccessKey: process.env.MINIO_SECRET_KEY || 'minioadmin',
+    accessKeyId: process.env.MINIO_ACCESS_KEY,
+    secretAccessKey: process.env.MINIO_SECRET_KEY,
   },
   forcePathStyle: true, // Required for MinIO
 });
@@ -30,10 +47,26 @@ export class MinIOService {
   }
 
   /**
-   * Upload a file to MinIO
+   * Upload a file to MinIO with validation
    */
   async uploadFile(file: Buffer, fileName: string, contentType?: string): Promise<UploadResult> {
     try {
+      // Validate file size
+      if (file.length > MAX_FILE_SIZE) {
+        return {
+          success: false,
+          error: `File size exceeds maximum allowed size of ${MAX_FILE_SIZE / (1024 * 1024)}MB`,
+        };
+      }
+
+      // Validate content type if provided
+      if (contentType && !ALLOWED_FILE_TYPES.includes(contentType)) {
+        return {
+          success: false,
+          error: `File type ${contentType} is not allowed. Allowed types: ${ALLOWED_FILE_TYPES.join(', ')}`,
+        };
+      }
+
       const command = new PutObjectCommand({
         Bucket: this.bucketName,
         Key: fileName,
@@ -44,7 +77,7 @@ export class MinIOService {
 
       await s3Client.send(command);
 
-      const url = `${process.env.MINIO_PUBLIC_URL || process.env.MINIO_ENDPOINT || 'http://157.66.35.109:9000'}/${this.bucketName}/${fileName}`;
+      const url = `${process.env.MINIO_PUBLIC_URL || process.env.MINIO_ENDPOINT}/${this.bucketName}/${fileName}`;
 
       return {
         success: true,
@@ -54,7 +87,7 @@ export class MinIOService {
       console.error('MinIO upload error:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Upload failed',
+        error: 'Upload failed',
       };
     }
   }

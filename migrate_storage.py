@@ -10,8 +10,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Load environment variables (no fallbacks for security)
-SUPABASE_URL = os.getenv('SUPABASE_URL2')
-SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY2')
+SUPABASE_URL = os.getenv('SUPABASE_URL')
+SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY')
 MINIO_ENDPOINT = os.getenv('MINIO_ENDPOINT')
 MINIO_ACCESS_KEY = os.getenv('MINIO_ACCESS_KEY')
 MINIO_SECRET_KEY = os.getenv('MINIO_SECRET_KEY')
@@ -19,8 +19,8 @@ MINIO_BUCKET = os.getenv('MINIO_BUCKET')
 
 # Validate required environment variables
 required_vars = [
-    ('SUPABASE_URL2', SUPABASE_URL),
-    ('SUPABASE_ANON_KEY2', SUPABASE_ANON_KEY),
+    ('SUPABASE_URL', SUPABASE_URL),
+    ('SUPABASE_ANON_KEY', SUPABASE_ANON_KEY),
     ('MINIO_ENDPOINT', MINIO_ENDPOINT),
     ('MINIO_ACCESS_KEY', MINIO_ACCESS_KEY),
     ('MINIO_SECRET_KEY', MINIO_SECRET_KEY),

@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../utils/auth';
-
-const prisma = new PrismaClient();
+import { prisma } from "@/app/utils/supabaseClient";
 
 interface UserWithCategories {
   id: string;

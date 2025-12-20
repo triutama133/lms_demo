@@ -987,11 +987,6 @@ export default function AdminDashboard() {
 
     setBulkCatsLoading(true); // Reuse the loading state
     try {
-      const currentCatNames = selectedCourseForCat.categories || [];
-      const currentCatIds = categories
-        .filter(cat => currentCatNames.includes(cat.name))
-        .map(cat => cat.id);
-
       // Use PUT endpoint to set categories directly
       const newCatIds = Array.from(courseCatSet);
 

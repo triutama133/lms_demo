@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from "@/app/utils/supabaseClient";
 import bcrypt from 'bcryptjs';
 import { setAuthCookie } from '../../utils/auth';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
@@ -34,13 +32,12 @@ export async function POST(request: Request) {
       select: { id: true, name: true, email: true, password: true, role: true }
     });
 
-    if (!user) {
-      return NextResponse.json({ success: false, error: 'Email atau password salah.' }, { status: 401 });
-    }
+    // Timing attack prevention: always hash password even if user not found
+    // Use dummy hash to maintain constant execution time
+    const passwordHash = user?.password || '$2a$10$dummyHashToPreventTimingAttack1234567890123456789012';
+    const match = await bcrypt.compare(password, passwordHash);
 
-    // Bandingkan password hash
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) {
+    if (!user || !match) {
       return NextResponse.json({ success: false, error: 'Email atau password salah.' }, { status: 401 });
     }
 

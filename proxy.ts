@@ -3,7 +3,7 @@ import { verifyAuthToken } from './lib/auth';
 
 const PUBLIC_PATHS = ['/lms/login', '/lms/register', '/lms/home'];
 
-export async function middleware(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (!pathname.startsWith('/lms')) {
     return NextResponse.next();

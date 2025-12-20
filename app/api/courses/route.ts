@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient, Prisma } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from "@/app/utils/supabaseClient";
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../utils/auth';
 import { filterCoursesByAccess, isCourseAccessibleByUser } from '../../utils/access';
-import { minIOService, MinIOService } from '../../../utils/minio';
+import { storageService } from '../../../utils/storage';
 
 async function requireTeacherOrAdmin() {
   const auth = await requireAuth();
@@ -75,11 +73,11 @@ export async function DELETE(request: Request) {
     if (materials.length > 0) {
       const fileNames = materials
         .filter((m) => m.pdfUrl)
-        .map((m) => MinIOService.extractFileNameFromUrl(m.pdfUrl!))
+        .map((m) => storageService.extractFileNameFromUrl(m.pdfUrl!))
         .filter(Boolean) as string[];
 
       if (fileNames.length > 0) {
-        const deleteResult = await minIOService.deleteFiles(fileNames);
+        const deleteResult = await storageService.deleteFiles(fileNames);
         if (!deleteResult.success) {
           console.error('Error deleting files from MinIO:', deleteResult.error);
           // Continue with course deletion even if file deletion fails
@@ -120,7 +118,7 @@ export async function POST(request: Request) {
     // Set default category if categories is empty or null
     const finalCategories = categories && categories.length > 0 ? categories : []; // No default category, course will be public
     const course = await prisma.course.create({
-      data: { title, description, teacherId: teacher_id, categories: finalCategories } as Prisma.CourseUncheckedCreateInput
+      data: { title, description, teacherId: teacher_id, categories: finalCategories }
     });
     return finalize({ success: true, course });
   } catch (error) {
@@ -179,7 +177,7 @@ export async function GET(request: Request) {
       // Process materials to replace URLs with public domain
       const processedMaterials = materials.map(material => ({
         ...material,
-        pdfUrl: material.pdfUrl ? MinIOService.replaceWithPublicUrl(material.pdfUrl) : null
+        pdfUrl: material.pdfUrl ? storageService.replaceWithPublicUrl(material.pdfUrl) : null
       }));
 
       // Enforce access for non-admin/teacher: Allow if course has no categories (public) or user has access

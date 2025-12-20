@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { authErrorResponse, refreshAuthCookie, requireAuth } from '../../utils/auth';
 import { isCourseAccessibleByUser } from '../../utils/access';
-
-const prisma = new PrismaClient();
+import { prisma } from "@/app/utils/supabaseClient";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);

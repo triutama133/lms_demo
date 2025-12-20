@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../utils/auth';
-import { minIOService, MinIOService } from '../../../utils/minio';
-
-const prisma = new PrismaClient();
+import { storageService } from '../../../utils/storage';
+import { prisma } from "@/app/utils/supabaseClient";
 
 async function requireTeacherOrAdmin() {
   const auth = await requireAuth();
@@ -42,9 +40,9 @@ export async function DELETE(req: NextRequest) {
     if (material.type === 'pdf' && material.pdfUrl) {
       try {
         // Extract file path from MinIO URL and delete
-        const fileName = MinIOService.extractFileNameFromUrl(material.pdfUrl);
+        const fileName = storageService.extractFileNameFromUrl(material.pdfUrl);
         if (fileName) {
-          await minIOService.deleteFile(fileName);
+          await storageService.deleteFile(fileName);
         }
       } catch {
         // Intentionally swallow errors when deleting remote file
@@ -100,7 +98,7 @@ export async function PUT(req: NextRequest) {
       const buffer = Buffer.from(await pdfFile.arrayBuffer());
       const fileName = `${id}_${Date.now()}_${pdfFile.name}`;
 
-      const uploadResult = await minIOService.uploadFile(buffer, fileName);
+      const uploadResult = await storageService.uploadFile(buffer, fileName, pdfFile.type || 'application/pdf');
       if (!uploadResult.success) {
         return finalize({ success: false, error: uploadResult.error || 'Upload gagal' }, { status: 500 });
       }
@@ -161,7 +159,7 @@ export async function POST(req: NextRequest) {
       const buffer = Buffer.from(await file.arrayBuffer());
       const fileName = `${course_id}_${Date.now()}_${file.name}`;
 
-      const uploadResult = await minIOService.uploadFile(buffer, fileName);
+      const uploadResult = await storageService.uploadFile(buffer, fileName, file.type || 'application/pdf');
       if (!uploadResult.success) {
         return finalize({ error: uploadResult.error || 'Upload gagal' }, { status: 500 });
       }
@@ -176,7 +174,7 @@ export async function POST(req: NextRequest) {
           pdfUrl,
         }
       });
-      return finalize({ success: true, pdfUrl: pdfUrl ? MinIOService.replaceWithPublicUrl(pdfUrl) : null, material });
+      return finalize({ success: true, pdfUrl: pdfUrl ? storageService.replaceWithPublicUrl(pdfUrl) : null, material });
     }
 
     const material = await prisma.material.create({

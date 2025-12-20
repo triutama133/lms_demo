@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../../utils/auth';
+import { prisma } from "@/app/utils/supabaseClient";
 
 interface EnrollRequest {
   course_id?: string;

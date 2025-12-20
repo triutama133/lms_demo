@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../../utils/auth';
-import { minIOService, MinIOService } from '../../../../utils/minio';
-
-const prisma = new PrismaClient();
+import { storageService } from '../../../../utils/storage';
+import { prisma } from "@/app/utils/supabaseClient";
 
 export async function GET(request: Request) {
   let auth;
@@ -187,13 +186,13 @@ export async function DELETE(request: Request) {
         .filter((m: { pdfUrl: string | null }) => m.pdfUrl)
         .map((m: { pdfUrl: string | null }) => {
           // Extract filename from MinIO Storage URL
-          const fileName = MinIOService.extractFileNameFromUrl(m.pdfUrl!);
+          const fileName = storageService.extractFileNameFromUrl(m.pdfUrl!);
           return fileName;
         })
         .filter(Boolean) as string[];
 
       if (fileNames.length > 0) {
-        const deleteResult = await minIOService.deleteFiles(fileNames);
+        const deleteResult = await storageService.deleteFiles(fileNames);
         if (!deleteResult.success) {
           console.error('Error deleting files from storage:', deleteResult.error);
           // Continue with course deletion even if file deletion fails
