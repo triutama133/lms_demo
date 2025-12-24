@@ -24,8 +24,8 @@ export async function GET(req: NextRequest) {
     if (fileUrl.includes('supabase.co')) {
       // Use Supabase storage
       presignedUrl = await storageService.getSignedUrl(fileName, 3600);
-    } else if (fileUrl.includes('minio') || fileUrl.includes('157.66.35.109')) {
-      // Use MinIO storage for legacy files
+    } else if ((fileUrl.includes('minio') || (process.env.MINIO_PUBLIC_URL && fileUrl.includes(process.env.MINIO_PUBLIC_URL.replace(/^https?:\/\//, '')))) && process.env.MINIO_ENDPOINT) {
+      // Use MinIO storage for legacy files if configured
       const minIOService = new MinIOService();
       presignedUrl = await minIOService.getSignedUrl(fileName, 3600);
     } else {
