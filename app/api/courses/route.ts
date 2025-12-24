@@ -126,7 +126,7 @@ export async function POST(request: Request) {
     const teacher = await dbService.user.findUnique({
       where: { id: teacher_id },
       select: { id: true, role: true }
-    });
+    }) as { id: string; role: string } | null;
     if (!teacher || !['teacher', 'admin'].includes(teacher.role)) {
       return finalize({ success: false, error: 'User bukan teacher atau admin.' }, { status: 400 });
     }
