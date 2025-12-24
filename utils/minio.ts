@@ -13,7 +13,7 @@ export const ALLOWED_FILE_TYPES = [
   'video/webm',
 ];
 
-// Validate required environment variables
+// Validate required environment variablescek saja ya
 if (!process.env.MINIO_ENDPOINT || !process.env.MINIO_ACCESS_KEY || !process.env.MINIO_SECRET_KEY) {
   throw new Error('MinIO configuration missing: MINIO_ENDPOINT, MINIO_ACCESS_KEY, and MINIO_SECRET_KEY must be set');
 }
