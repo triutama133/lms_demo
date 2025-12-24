@@ -127,7 +127,7 @@ export async function POST(request: Request) {
       where: { id: teacher_id },
       select: { id: true, role: true }
     });
-    if (!teacher || typeof teacher !== 'object' || !('role' in teacher) || !['teacher', 'admin'].includes((teacher as any).role)) {
+    if (!teacher || !['teacher', 'admin'].includes(teacher.role)) {
       return finalize({ success: false, error: 'User bukan teacher atau admin.' }, { status: 400 });
     }
 

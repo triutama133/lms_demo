@@ -20,10 +20,6 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, error: 'user_ids harus berupa array dan tidak boleh kosong.' }, { status: 400 });
     }
 
-    // Short-lived debug: log raw incoming shape when an error occurs
-    // (helps capture shapes like [{ id: { value: '...' } }])
-    const rawPayload = user_ids;
-
     // UUID validator
     const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -67,7 +63,7 @@ export async function DELETE(request: Request) {
       try {
         const s = JSON.stringify(v);
         return s.length > 200 ? s.slice(0, 200) + '...' : s;
-      } catch (e) {
+      } catch {
         try { return String(v); } catch { return '<unserializable>' }
       }
     };
