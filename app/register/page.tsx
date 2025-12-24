@@ -11,16 +11,27 @@ export default function Register() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [captchaValue, setCaptchaValue] = useState('');
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
 
-  // Generate simple math captcha (addition)
+  // Track hydration to avoid mismatch
   useEffect(() => {
-    // Not needed for custom captcha
+    setMounted(true);
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
+
+  // Password criteria checks (computed on render for real-time feedback)
+  const pw = form.password || '';
+  const pwChecks = {
+    min: pw.length >= 8,
+    upper: /[A-Z]/.test(pw),
+    lower: /[a-z]/.test(pw),
+    number: /\d/.test(pw),
+    special: /[^A-Za-z0-9]/.test(pw),
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,6 +42,15 @@ export default function Register() {
     // Validate captcha (basic check)
     if (!captchaValue || captchaValue.length < 4) {
       setError('Captcha belum diisi dengan benar.');
+      setLoading(false);
+      return;
+    }
+
+    // Validate password requirements: min 8, upper, lower, number, special
+    const pw = form.password || '';
+    const pwRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+    if (!pwRegex.test(pw)) {
+      setError('Password harus minimal 8 karakter, berisi huruf besar, huruf kecil, angka, dan karakter spesial.');
       setLoading(false);
       return;
     }
@@ -120,6 +140,52 @@ export default function Register() {
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
             <input type="password" id="password" name="password" required value={form.password} onChange={handleChange} className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            <p className="mt-2 text-sm text-gray-600">Password harus minimal 8 karakter dan mengandung: huruf besar, huruf kecil, angka, dan karakter spesial.</p>
+
+            {mounted && (
+              <ul className="mt-2 grid grid-cols-1 gap-1 text-sm">
+                <li className="flex items-center gap-2 text-gray-600">
+                  {pwChecks.min ? (
+                    <svg className="w-4 h-4 text-green-600" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 00-1.414-1.414L7 12.172 4.707 9.879A1 1 0 003.293 11.293l3 3a1 1 0 001.414 0l9-9z" clipRule="evenodd"/></svg>
+                  ) : (
+                    <svg className="w-4 h-4 text-gray-300" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="10"/></svg>
+                  )}
+                  <span className={pwChecks.min ? 'text-gray-800' : ''}>Minimal 8 karakter</span>
+                </li>
+                <li className="flex items-center gap-2 text-gray-600">
+                  {pwChecks.upper ? (
+                    <svg className="w-4 h-4 text-green-600" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 00-1.414-1.414L7 12.172 4.707 9.879A1 1 0 003.293 11.293l3 3a1 1 0 001.414 0l9-9z" clipRule="evenodd"/></svg>
+                  ) : (
+                    <svg className="w-4 h-4 text-gray-300" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="10"/></svg>
+                  )}
+                  <span className={pwChecks.upper ? 'text-gray-800' : ''}>Mengandung huruf besar (A-Z)</span>
+                </li>
+                <li className="flex items-center gap-2 text-gray-600">
+                  {pwChecks.lower ? (
+                    <svg className="w-4 h-4 text-green-600" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 00-1.414-1.414L7 12.172 4.707 9.879A1 1 0 003.293 11.293l3 3a1 1 0 001.414 0l9-9z" clipRule="evenodd"/></svg>
+                  ) : (
+                    <svg className="w-4 h-4 text-gray-300" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="10"/></svg>
+                  )}
+                  <span className={pwChecks.lower ? 'text-gray-800' : ''}>Mengandung huruf kecil (a-z)</span>
+                </li>
+                <li className="flex items-center gap-2 text-gray-600">
+                  {pwChecks.number ? (
+                    <svg className="w-4 h-4 text-green-600" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 00-1.414-1.414L7 12.172 4.707 9.879A1 1 0 003.293 11.293l3 3a1 1 0 001.414 0l9-9z" clipRule="evenodd"/></svg>
+                  ) : (
+                    <svg className="w-4 h-4 text-gray-300" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="10"/></svg>
+                  )}
+                  <span className={pwChecks.number ? 'text-gray-800' : ''}>Mengandung angka (0-9)</span>
+                </li>
+                <li className="flex items-center gap-2 text-gray-600">
+                  {pwChecks.special ? (
+                    <svg className="w-4 h-4 text-green-600" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 00-1.414-1.414L7 12.172 4.707 9.879A1 1 0 003.293 11.293l3 3a1 1 0 001.414 0l9-9z" clipRule="evenodd"/></svg>
+                  ) : (
+                    <svg className="w-4 h-4 text-gray-300" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="10"/></svg>
+                  )}
+                  <span className={pwChecks.special ? 'text-gray-800' : ''}>Mengandung karakter spesial (contoh: !@#$%)</span>
+                </li>
+              </ul>
+            )}
           </div>
 
           <Captcha onChange={setCaptchaValue} />

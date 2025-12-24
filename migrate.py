@@ -10,24 +10,21 @@ load_dotenv()
 # Load environment variables for security
 SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY')
-VPS_HOST = os.getenv('VPS_HOST')
-VPS_DB = os.getenv('VPS_DB')
-VPS_USER = os.getenv('VPS_USER')
-VPS_PASSWORD = os.getenv('VPS_PASSWORD')
+DATABASE_URL = os.getenv('DATABASE_URL')
 
-if not all([SUPABASE_URL, SUPABASE_ANON_KEY, VPS_HOST, VPS_DB, VPS_USER, VPS_PASSWORD]):
-    raise ValueError("Missing required environment variables. Set SUPABASE_URL, SUPABASE_ANON_KEY, VPS_HOST, VPS_DB, VPS_USER, VPS_PASSWORD")
+if not all([SUPABASE_URL, SUPABASE_ANON_KEY, DATABASE_URL]):
+    raise ValueError("Missing required environment variables. Set SUPABASE_URL, SUPABASE_ANON_KEY, DATABASE_URL")
+
+print("=== Starting Migration from Supabase to VPS PostgreSQL ===")
+print(f"Source: {SUPABASE_URL}")
+print(f"Destination: VPS PostgreSQL (via SSH tunnel)")
+print()
 
 # Connect to Supabase
 supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-# Connect to VPS PostgreSQL
-vps_conn = psycopg2.connect(
-    host=VPS_HOST,
-    database=VPS_DB,
-    user=VPS_USER,
-    password=VPS_PASSWORD
-)
+# Connect to VPS PostgreSQL (via SSH tunnel - localhost:5432)
+vps_conn = psycopg2.connect(DATABASE_URL)
 vps_cur = vps_conn.cursor()
 
 # Tables to migrate
@@ -68,16 +65,59 @@ def migrate_table(table_name):
             if not has_default:
                 data.insert(0, DEFAULT_CATEGORY)  # Add default at the beginning
                 print("Added default category to migration data")
+        
+        # Validate foreign keys for enrollments, materials, material_sections
+        if table_name == 'enrollments':
+            # Get valid course_ids from database
+            vps_cur.execute("SELECT id FROM courses")
+            valid_course_ids = {row[0] for row in vps_cur.fetchall()}
+            original_count = len(data)
+            data = [r for r in data if r.get('course_id') in valid_course_ids]
+            if len(data) < original_count:
+                print(f"Skipped {original_count - len(data)} enrollments with invalid course_id")
+        
+        if table_name == 'materials':
+            # Get valid course_ids from database
+            vps_cur.execute("SELECT id FROM courses")
+            valid_course_ids = {row[0] for row in vps_cur.fetchall()}
+            original_count = len(data)
+            data = [r for r in data if r.get('course_id') in valid_course_ids]
+            if len(data) < original_count:
+                print(f"Skipped {original_count - len(data)} materials with invalid course_id")
+        
+        if table_name == 'material_sections':
+            # Get valid material_ids from database
+            vps_cur.execute("SELECT id FROM materials")
+            valid_material_ids = {row[0] for row in vps_cur.fetchall()}
+            original_count = len(data)
+            data = [r for r in data if r.get('material_id') in valid_material_ids]
+            if len(data) < original_count:
+                print(f"Skipped {original_count - len(data)} material_sections with invalid material_id")
+        
+        if not data:
+            print(f"No valid data to migrate for {table_name}")
+            return
 
-        # Special handling for courses: Set default category if category_id is null
-        if table_name == 'courses':
-            for record in data:
-                if record.get('category_id') is None:
-                    record['category_id'] = DEFAULT_CATEGORY['id']
-                    print(f"Set default category for course {record.get('id')}")
-
-        # Get columns
+        # Get columns from Supabase data
         columns = list(data[0].keys())
+        
+        # Get actual columns from VPS database
+        vps_cur.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}' ORDER BY ordinal_position")
+        db_columns = [row[0] for row in vps_cur.fetchall()]
+        
+        # Filter columns to only those that exist in VPS database
+        valid_columns = [col for col in columns if col in db_columns]
+        
+        # Remove invalid columns from data
+        if len(valid_columns) < len(columns):
+            removed_cols = [col for col in columns if col not in db_columns]
+            print(f"Skipping columns not in VPS database: {', '.join(removed_cols)}")
+            # Remove those columns from all records
+            for record in data:
+                for col in removed_cols:
+                    record.pop(col, None)
+        
+        columns = valid_columns
         quoted_columns = [f'"{col}"' for col in columns]
 
         # Fetch existing data from VPS for comparison

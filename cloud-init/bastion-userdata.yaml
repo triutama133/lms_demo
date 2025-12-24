@@ -1,0 +1,69 @@
+#cloud-config
+write_files:
+  - path: /usr/local/bin/setup_bastion.sh
+    owner: root:root
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      # === EDIT THESE VALUES IF NEEDED ===
+      DB_HOST="103.31.205.81"         # Postgres server IP (DB host)
+      DB_PORT="5432"
+      DB_NAME="lms_db"
+      DB_USER="lms_user"
+      DB_PASS="ilmilms133133!"         # from .env
+      PGB_PORT="6432"
+      # ===================================
+
+      apt-get update
+      DEBIAN_FRONTEND=noninteractive apt-get install -y pgbouncer postgresql-client ufw curl ca-certificates gnupg
+
+      # create pgbouncer directory
+      mkdir -p /etc/pgbouncer
+
+      # create auth file: postgres md5 format is md5(password+username)
+      MD5HEX=$(printf "%s%s" "${DB_PASS}" "${DB_USER}" | md5sum | awk '{print $1}')
+      cat > /etc/pgbouncer/userlist.txt <<EOF
+"${DB_USER}" "md5${MD5HEX}"
+EOF
+      chmod 600 /etc/pgbouncer/userlist.txt
+      chown root:root /etc/pgbouncer/userlist.txt
+
+      # write pgbouncer.ini
+      cat > /etc/pgbouncer/pgbouncer.ini <<EOF
+[databases]
+${DB_NAME} = host=${DB_HOST} port=${DB_PORT} dbname=${DB_NAME}
+
+[pgbouncer]
+listen_addr = 0.0.0.0
+listen_port = ${PGB_PORT}
+auth_type = md5
+auth_file = /etc/pgbouncer/userlist.txt
+pool_mode = transaction
+max_client_conn = 200
+default_pool_size = 20
+log_connections = 1
+log_disconnections = 1
+EOF
+
+      # ensure pgbouncer will start
+      if [ -f /etc/default/pgbouncer ]; then
+        sed -i 's/^START=.*/START=yes/' /etc/default/pgbouncer || true
+      else
+        echo "START=yes" > /etc/default/pgbouncer
+      fi
+
+      systemctl daemon-reload
+      systemctl enable --now pgbouncer || true
+
+      # firewall
+      ufw allow OpenSSH
+      ufw allow "${PGB_PORT}/tcp"
+      ufw --force enable
+
+      echo "Bastion public IP:"
+      curl -s https://ifconfig.me || true
+runcmd:
+  - /usr/local/bin/setup_bastion.sh
+final_message: "Bastion + pgbouncer setup complete. Edit /usr/local/bin/setup_bastion.sh to change DB credentials before running if needed."
