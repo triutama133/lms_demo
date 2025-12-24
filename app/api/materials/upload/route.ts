@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { prisma } from "@/app/utils/supabaseClient";
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../../utils/auth';
 import { storageService } from '../../../../utils/storage';
+import { dbService } from '../../../../utils/database';
 
 export async function POST(request: Request) {
   let auth;
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     }
 
     // Simpan metadata ke tabel materials
-    const material = await prisma.material.create({
+    const material = await dbService.material.create({
       data: {
         title: title as string,
         type: type as string,

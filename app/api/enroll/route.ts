@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { authErrorResponse, refreshAuthCookie, requireAuth } from '../../utils/auth';
 import { isCourseAccessibleByUser } from '../../utils/access';
-import { prisma } from "@/app/utils/supabaseClient";
+import { dbService } from '../../../utils/database';
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -27,10 +27,10 @@ export async function GET(request: Request) {
     return authErrorResponse(new Error('Forbidden'));
   }
   // Category-based access: block enroll if student does not have required category
-  const enrollments = await prisma.enrollment.findMany({
+  const enrollments = await dbService.enrollment.findMany({
     where: { userId: userId },
     select: { courseId: true }
-  });
+  }) as { courseId: string }[];
 
   const courseIds = enrollments.map((e) => e.courseId);
   if (!courseIds.length) {
@@ -39,10 +39,10 @@ export async function GET(request: Request) {
   // No need to check access control for already enrolled courses
   // User should be able to see their enrolled courses even if categories change later
   // ...existing code...
-  const courses = await prisma.course.findMany({
+  const courses = await dbService.course.findMany({
     where: { id: { in: courseIds } },
     select: { id: true, title: true, description: true }
-  });
+  }) as { id: string; title: string; description: string | null }[];
 
   return finalize({ success: true, courses });
 }
@@ -84,12 +84,12 @@ export async function POST(request: Request) {
     }
 
     try {
-      const existing = await prisma.enrollment.findFirst({
+      const existing = await dbService.enrollment.findFirst({
         where: {
           userId: userId,
           courseId: courseId
         }
-      });
+      }) as { id: string } | null;
 
       console.log('Existing enrollment check:', existing);
 
@@ -100,12 +100,12 @@ export async function POST(request: Request) {
 
       console.log('Creating new enrollment...');
 
-      const data = await prisma.enrollment.create({
+      const data = await dbService.enrollment.create({
         data: {
           userId: userId,
           courseId: courseId
         }
-      });
+      }) as { id: string };
 
       console.log('Insert result:', data);
 

@@ -134,8 +134,6 @@ export default function MaterialDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [progressUpdated, setProgressUpdated] = useState(false);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [loadingPdf, setLoadingPdf] = useState(false);
   const [sections, setSections] = useState<Section[]>([]);
   const [expandedIndex, setExpandedIndex] = useState<number>(-1);
   const sectionRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -190,29 +188,6 @@ export default function MaterialDetailPage() {
       setExpandedIndex(-1);
     }
   }, [sections]);
-
-  const getPresignedUrl = async (fileUrl: string) => {
-    setLoadingPdf(true);
-    try {
-      const response = await fetch(`/api/materials/presigned?url=${encodeURIComponent(fileUrl)}`);
-      const data = await response.json();
-      if (data.success) {
-        setPdfUrl(data.url);
-      } else {
-        console.error('Failed to get presigned URL:', data.error);
-      }
-    } catch (error) {
-      console.error('Error getting presigned URL:', error);
-    } finally {
-      setLoadingPdf(false);
-    }
-  };
-
-  useEffect(() => {
-    if (material?.type === 'pdf' && material.pdf_url && !pdfUrl) {
-      getPresignedUrl(material.pdf_url);
-    }
-  }, [material, pdfUrl]);
 
   const renderIframeNode = (node: Element) => {
     const src = node.attribs?.src ? normalizeExternalUrl(node.attribs.src.trim()) : '';
@@ -350,30 +325,30 @@ export default function MaterialDetailPage() {
                     <div>
                       <h2 className="text-lg font-semibold text-blue-800">Pratinjau Dokumen</h2>
                       <p className="text-sm text-slate-500">
-                        {loadingPdf ? 'Memuat dokumen...' : 'Tekan tombol di bawah untuk membuka dokumen penuh layar atau baca langsung dari pratinjau.'}
+                        Tekan tombol di bawah untuk membuka dokumen penuh layar atau baca langsung dari pratinjau.
                       </p>
                     </div>
-                    {pdfUrl && (
-                      <a
-                        href={pdfUrl}
+                    {material.pdf_url && (
+                      <Link
+                        href={`/api/materials/presigned?url=${encodeURIComponent(material.pdf_url)}&stream=1`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:from-blue-700 hover:to-purple-700"
                       >
                         Buka di Tab Baru
-                      </a>
+                      </Link>
                     )}
                   </div>
-                  {pdfUrl ? (
+                  {material.pdf_url ? (
                     <iframe
-                      src={pdfUrl}
+                      src={`/api/materials/presigned?url=${encodeURIComponent(material.pdf_url)}&stream=1`}
                       title="Pratinjau PDF"
                       className="mt-6 h-[520px] w-full rounded-2xl border border-slate-200 shadow-lg"
                     />
                   ) : (
                     <div className="mt-6 flex h-[520px] w-full items-center justify-center rounded-2xl border border-slate-200 bg-slate-50">
                       <p className="text-slate-500">
-                        {loadingPdf ? 'Memuat PDF...' : 'Gagal memuat PDF'}
+                        PDF tidak tersedia
                       </p>
                     </div>
                   )}

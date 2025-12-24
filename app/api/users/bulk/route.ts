@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import { prisma } from "@/app/utils/supabaseClient";
 import { v4 as uuidv4 } from 'uuid';
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../../utils/auth';
+import { dbService } from '../../../../utils/database';
 
 export async function POST(req: Request) {
   let auth;
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
       // Set default password jika kosong
       const rawPassword = u.password && u.password.trim() ? u.password : 'ilmi123';
       // Cek email duplikat
-      const existing = await prisma.user.findUnique({
+      const existing = await dbService.user.findUnique({
         where: { email: u.email },
         select: { id: true }
       });
@@ -73,7 +73,7 @@ export async function POST(req: Request) {
         password: hashed,
       };
       try {
-        await prisma.user.create({
+        await dbService.user.create({
           data: user
         });
       } catch (errInsert: unknown) {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../../utils/auth';
-import { prisma } from "@/app/utils/supabaseClient";
+import { dbService } from '../../../../utils/database';
 
 interface EnrollRequest {
   course_id?: string;
@@ -38,9 +38,9 @@ export async function POST(req: Request) {
 
     let targetUserIds: string[] = [];
     if (enrollAll) {
-      const users = await prisma.user.findMany({
+      const users = await dbService.user.findMany({
         select: { id: true }
-      });
+      }) as { id: string }[];
       targetUserIds = users.map((row) => row.id).filter(Boolean);
     } else {
       targetUserIds = selectedUserIds;
@@ -52,13 +52,13 @@ export async function POST(req: Request) {
 
     const uniqueUserIds = Array.from(new Set(targetUserIds));
 
-    const existingEnrollments = await prisma.enrollment.findMany({
+    const existingEnrollments = await dbService.enrollment.findMany({
       where: {
         courseId: courseId,
         userId: { in: uniqueUserIds }
       },
       select: { userId: true }
-    });
+    }) as { userId: string }[];
 
     const alreadyEnrolledIds = new Set(existingEnrollments.map((row) => row.userId));
     const newUserIds = uniqueUserIds.filter((id) => !alreadyEnrolledIds.has(id));
@@ -76,7 +76,7 @@ export async function POST(req: Request) {
       courseId,
     }));
 
-    await prisma.enrollment.createMany({
+    await dbService.enrollment.createMany({
       data: enrollmentRows
     });
 

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../../../utils/auth';
-import { prisma } from "@/app/utils/supabaseClient";
+import { dbService } from '../../../../../utils/database';
 
 type Enrollment = {
   userId: string;
@@ -40,10 +40,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ cour
 
   try {
     // Check if course exists and user has permission
-    const course = await prisma.course.findUnique({
+    const course = await dbService.course.findUnique({
       where: { id: courseId },
       select: { id: true, title: true, teacherId: true }
-    });
+    }) as { id: string; title: string; teacherId: string } | null;
 
     if (!course) {
       return finalize({ success: false, error: 'Course tidak ditemukan' }, { status: 404 });
@@ -55,11 +55,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ cour
     }
 
     // Get enrollments for this course
-    const enrollments = await prisma.enrollment.findMany({
+    const enrollments = await dbService.enrollment.findMany({
       where: { courseId },
       select: { userId: true, enrolledAt: true },
       orderBy: { enrolledAt: 'desc' }
-    });
+    }) as { userId: string; enrolledAt: Date }[];
 
     if (enrollments.length === 0) {
       return finalize({ success: true, participants: [] });
@@ -67,17 +67,17 @@ export async function GET(request: Request, { params }: { params: Promise<{ cour
 
     // Get user data for enrolled users
     const userIds = enrollments.map((e: Enrollment) => e.userId);
-    const users = await prisma.user.findMany({
+    const users = await dbService.user.findMany({
       where: { id: { in: userIds } },
       select: { id: true, name: true, email: true, role: true, provinsi: true }
-    });
+    }) as { id: string; name: string; email: string; role: string; provinsi: string | null }[];
 
     // Combine enrollment data with user data
     const participants = users.map((user: User) => {
       const enrollment = enrollments.find((e: Enrollment) => e.userId === user.id);
       return {
         ...user,
-        enrolled_at: enrollment?.enrolledAt?.toISOString()
+        enrolled_at: enrollment?.enrolledAt ? new Date(enrollment.enrolledAt).toISOString() : null
       };
     });
 

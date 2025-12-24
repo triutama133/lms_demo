@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { authErrorResponse, refreshAuthCookie, requireAuth } from '../../../utils/auth';
-import { prisma } from "@/app/utils/supabaseClient";
+import { dbService } from '../../../../utils/database';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -31,41 +31,54 @@ export async function GET(req: Request) {
   }
 
   try {
-    // Get all enrollments for user with course and teacher info
-    const enrollments = await prisma.enrollment.findMany({
+    // Get all enrollments for user
+    const enrollments = await dbService.enrollment.findMany({
       where: { userId: user_id },
-      include: {
-        course: {
-          include: {
-            teacher: {
-              select: { name: true }
-            }
-          }
-        }
-      }
-    });
+      select: { courseId: true }
+    }) as { courseId: string }[];
+
+    const courseIds = enrollments.map(e => e.courseId);
 
     const progressData = [];
 
-    for (const enrollment of enrollments) {
-      const course = enrollment.course;
+    for (const courseId of courseIds) {
+      // Get course info
+      const course = await dbService.course.findUnique({
+        where: { id: courseId },
+        select: { id: true, title: true, description: true, teacherId: true }
+      }) as { id: string; title: string; description: string | null; teacherId: string } | null;
+
       if (!course) continue;
 
+      // Get teacher info
+      const teacher = await dbService.user.findUnique({
+        where: { id: course.teacherId },
+        select: { name: true }
+      }) as { name: string } | null;
+
       // Get all materials for this course
-      const materials = await prisma.material.findMany({
+      const materials = await dbService.material.findMany({
         where: { courseId: course.id },
         select: { id: true, title: true, type: true, order: true },
         orderBy: { order: 'asc' }
-      });
+      }) as { id: string; title: string; type: string; order: number | null }[];
 
       // Get progress for this user and course
-      const progress = await prisma.progress.findMany({
+      const progress = await dbService.progress.findMany({
         where: {
           userId: user_id,
           courseId: course.id
         },
         select: { materialId: true, completed: true, updatedAt: true }
-      });
+      }) as { materialId: string; completed: boolean; updatedAt: Date }[];
+
+      // Get enrollment info
+      const enrollment = await dbService.enrollment.findFirst({
+        where: { userId: user_id, courseId: courseId },
+        select: { id: true, enrolledAt: true }
+      }) as { id: string; enrolledAt: Date } | null;
+
+      if (!enrollment) continue;
 
       // Calculate completion stats
       const totalMaterials = materials.length;
@@ -84,7 +97,7 @@ export async function GET(req: Request) {
         courseId: course.id,
         courseTitle: course.title,
         courseDescription: course.description,
-        teacherName: course.teacher?.name || 'Unknown',
+        teacherName: teacher?.name || 'Unknown',
         enrollmentId: enrollment.id,
         enrolledAt: enrollment.enrolledAt,
         totalMaterials,

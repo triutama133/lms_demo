@@ -5,6 +5,7 @@ import { MinIOService } from '../../../../utils/minio';
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const fileUrl = searchParams.get('url');
+  const stream = searchParams.get('stream') === '1' || searchParams.get('stream') === 'true';
 
   if (!fileUrl) {
     return NextResponse.json({ success: false, error: 'File URL required' }, { status: 400 });
@@ -36,9 +37,35 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Failed to generate access URL' }, { status: 500 });
     }
 
-    return NextResponse.json({
-      success: true,
-      url: presignedUrl
+    if (!stream) {
+      const proxiedUrl = new URL(req.url);
+      proxiedUrl.searchParams.set('stream', '1');
+      proxiedUrl.searchParams.set('url', fileUrl);
+      return NextResponse.json({ success: true, url: `${proxiedUrl.pathname}?${proxiedUrl.searchParams.toString()}` });
+    }
+
+    // Stream the file so the user only ever sees the localhost URL
+    const fileResponse = await fetch(presignedUrl);
+    if (!fileResponse.ok || !fileResponse.body) {
+      return NextResponse.json({ success: false, error: 'Failed to fetch file' }, { status: 502 });
+    }
+
+    const headers = new Headers();
+    headers.set('Content-Type', fileResponse.headers.get('content-type') ?? 'application/pdf');
+    const contentLength = fileResponse.headers.get('content-length');
+    if (contentLength) {
+      headers.set('Content-Length', contentLength);
+    }
+    const safeFileName = fileName.split('?')[0] || 'file.pdf';
+    headers.set(
+      'Content-Disposition',
+      fileResponse.headers.get('content-disposition') ?? `inline; filename="${safeFileName}"`,
+    );
+    headers.set('Cache-Control', 'private, max-age=0, no-store');
+
+    return new NextResponse(fileResponse.body, {
+      status: 200,
+      headers,
     });
 
   } catch (error) {

@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
-import { Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../utils/auth';
-import { prisma } from "@/app/utils/supabaseClient";
+import { dbService } from '../../../utils/database';
 
 interface UserWithCategories {
   id: string;
@@ -45,8 +44,8 @@ export async function GET(request: Request) {
 
     try {
       // Build where conditions
-      const where: Prisma.UserWhereInput = {};
-      
+      const where: Record<string, unknown> = {};
+
       if (search) {
         where.OR = [
           { name: { contains: search, mode: 'insensitive' } },
@@ -71,25 +70,26 @@ export async function GET(request: Request) {
       }
 
       // Get users with count
-      const [users, totalCount] = await Promise.all([
-        prisma.user.findMany({
+      const [usersResult, totalCount] = await Promise.all([
+        dbService.user.findMany({
           where,
           select: { id: true, name: true, email: true, role: true, provinsi: true, categories: true },
           orderBy: { name: 'asc' },
           skip,
           take: limit
         }),
-        prisma.user.count({ where })
+        dbService.user.count({ where })
       ]);
+      const users = usersResult as UserWithCategories[];
 
       // Get all unique category IDs from all users
       const allCategoryIds = [...new Set(users.flatMap((user: UserWithCategories) => user.categories || []).filter(Boolean))];
       let categoryMap: Record<string, string> = {};
       if (allCategoryIds.length > 0) {
-        const categories = await prisma.category.findMany({
+        const categories = await dbService.category.findMany({
           where: { id: { in: allCategoryIds } },
           select: { id: true, name: true }
-        });
+        }) as CategoryRow[];
         categoryMap = Object.fromEntries(categories.map((row: CategoryRow) => [row.id, row.name]));
       }
 
@@ -107,7 +107,7 @@ export async function GET(request: Request) {
             return 0;
           }
           const roleWhere = { ...where, role };
-          const count = await prisma.user.count({ where: roleWhere });
+          const count = await dbService.user.count({ where: roleWhere });
           return count;
         }));
 
@@ -170,7 +170,7 @@ export async function PUT(request: Request) {
   }
   
   try {
-    await prisma.user.update({
+    await dbService.user.update({
       where: { id },
       data: updateData
     });
@@ -201,12 +201,21 @@ export async function POST(request: Request) {
   if (!name || !email || !role) {
     return NextResponse.json({ success: false, error: 'Nama, email, dan role wajib diisi.' }, { status: 400 });
   }
+  if (!['student', 'teacher', 'admin'].includes(role)) {
+    return NextResponse.json({ success: false, error: 'Role harus student, teacher, atau admin.' }, { status: 400 });
+  }
 
   try {
     // Check if email already exists
-    const existing = await prisma.user.findUnique({
-      where: { email }
-    });
+    let existing;
+    try {
+      existing = await dbService.user.findUnique({
+        where: { email }
+      }) as { id: string } | null;
+    } catch (checkError) {
+      console.error('Error checking existing user:', checkError);
+      return NextResponse.json({ success: false, error: 'Error checking user existence.' }, { status: 500 });
+    }
 
     if (existing) {
       return NextResponse.json({ success: false, error: 'Email sudah terdaftar.' }, { status: 400 });
@@ -214,15 +223,16 @@ export async function POST(request: Request) {
 
     const hashed = await bcrypt.hash(password || 'ilmi123', 10);
     const user = {
-      id: uuidv4(),
+      ...(process.env.DATABASE_TYPE === 'prisma' ? { id: uuidv4() } : {}),
       name,
       email,
       role,
       provinsi: provinsi || '',
       password: hashed,
+      // categories: [], // Remove to use default
     };
 
-    await prisma.user.create({
+    await dbService.user.create({
       data: user
     });
   } catch (error) {
@@ -256,10 +266,10 @@ export async function DELETE(request: Request) {
 
   try {
     // Check if user exists
-    const existing = await prisma.user.findUnique({
+    const existing = await dbService.user.findUnique({
       where: { id },
       select: { id: true, name: true, email: true, role: true }
-    });
+    }) as { id: string; name: string; email: string; role: string } | null;
 
     if (!existing) {
       return NextResponse.json({ success: false, error: 'User tidak ditemukan.' }, { status: 404 });
@@ -268,10 +278,10 @@ export async function DELETE(request: Request) {
     // If user is a teacher, reassign their courses to an admin
     if (existing.role === 'teacher') {
       // Find an admin to reassign courses to
-      const adminUser = await prisma.user.findFirst({
+      const adminUser = await dbService.user.findFirst({
         where: { role: 'admin' },
         select: { id: true, name: true }
-      });
+      }) as { id: string; name: string } | null;
 
       if (!adminUser) {
         return NextResponse.json({ 
@@ -281,14 +291,14 @@ export async function DELETE(request: Request) {
       }
 
       // Reassign all courses from this teacher to the admin
-      await prisma.course.updateMany({
+      await dbService.course.updateMany({
         where: { teacherId: id },
         data: { teacherId: adminUser.id }
       });
     }
 
     // Delete user
-    await prisma.user.delete({
+    await dbService.user.delete({
       where: { id }
     });
 

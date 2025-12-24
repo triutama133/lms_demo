@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../../utils/auth';
-import { prisma } from "@/app/utils/supabaseClient";
+import { dbService } from '../../../../utils/database';
 
 export async function GET(request: Request) {
   let auth;
@@ -23,10 +23,10 @@ export async function GET(request: Request) {
   if (!courseId) {
     return finalize({ success: false, error: 'course_id wajib diisi' }, { status: 400 });
   }
-  const course = await prisma.course.findUnique({
+  const course = await dbService.course.findUnique({
     where: { id: courseId },
     select: { teacherId: true }
-  });
+  }) as { teacherId: string } | null;
   if (!course) {
     return finalize({ success: false, error: 'Course tidak ditemukan' }, { status: 404 });
   }
@@ -34,21 +34,27 @@ export async function GET(request: Request) {
     return authErrorResponse(new Error('Forbidden'));
   }
 
-  // Ambil enrollments untuk course ini
-  const enrollments = await prisma.enrollment.findMany({
-    where: { courseId },
-    select: { userId: true }
-  });
-  if (!enrollments || enrollments.length === 0) {
-    return finalize({ success: true, participants: [] });
+  try {
+    // Ambil enrollments untuk course ini
+    const enrollments = await dbService.enrollment.findMany({
+      where: { courseId },
+      select: { userId: true }
+    }) as { userId: string }[];
+    if (!enrollments || enrollments.length === 0) {
+      return finalize({ success: true, participants: [] });
+    }
+
+    // Ambil data user dari user_id hasil enrollments
+    const userIds = enrollments.map((e) => e.userId);
+    const users = await dbService.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, name: true, email: true }
+    });
+
+    return finalize({ success: true, participants: users });
+  } catch (error) {
+    console.error('Error fetching participants:', error);
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    return finalize({ success: false, error: `Gagal fetch data: ${errorMsg}` }, { status: 500 });
   }
-
-  // Ambil data user dari user_id hasil enrollments
-  const userIds = enrollments.map((e) => e.userId);
-  const users = await prisma.user.findMany({
-    where: { id: { in: userIds } },
-    select: { id: true, name: true, email: true }
-  });
-
-  return finalize({ success: true, participants: users });
 }

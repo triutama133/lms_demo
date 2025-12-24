@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
-import { prisma } from "@/app/utils/supabaseClient";
+import { dbService } from '../../../utils/database';
 
 export async function GET() {
   try {
     // Test basic connection
-    const data = await prisma.user.findMany({
+    const data = await dbService.user.findMany({
       select: { id: true },
       take: 1
-    });
+    }) as { id: string }[];
 
     return NextResponse.json({
       success: true,

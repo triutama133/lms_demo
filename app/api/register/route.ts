@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from "@/app/utils/supabaseClient";
+import { dbService } from '../../../utils/database';
 import bcrypt from 'bcryptjs';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
 import { v4 as uuidv4 } from 'uuid';
@@ -64,10 +64,10 @@ export async function POST(request: Request) {
 
   try {
     // Check if email already exists
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await dbService.user.findUnique({
       where: { email: normalizedEmail },
       select: { id: true }
-    });
+    }) as { id: string } | null;
 
     if (existingUser) {
       return NextResponse.json({ success: false, error: 'Email sudah terdaftar.' }, { status: 409 });
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
     const sanitizedProvinsi = provinsi ? provinsi.trim().replace(/[<>"']/g, '') : '';
 
     // Insert user to users table, set default role 'student'
-    const user = await prisma.user.create({
+    const user = await dbService.user.create({
       data: { 
         id: uuidv4(), 
         name: sanitizedName, 
@@ -86,10 +86,10 @@ export async function POST(request: Request) {
         role: 'student', 
         provinsi: sanitizedProvinsi 
       }
-    });
+    }) as { id: string; name: string; email: string; role: string; provinsi: string | null };
 
     // Remove password from response
-    const { password: _, ...userWithoutPassword } = user;
+    const userWithoutPassword = { id: user.id, name: user.name, email: user.email, role: user.role, provinsi: user.provinsi };
     return NextResponse.json({ success: true, data: userWithoutPassword });
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Database error';

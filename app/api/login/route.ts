@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from "@/app/utils/supabaseClient";
+import { dbService } from '../../../utils/database';
 import bcrypt from 'bcryptjs';
 import { setAuthCookie } from '../../utils/auth';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
@@ -27,10 +27,10 @@ export async function POST(request: Request) {
 
   try {
     // Cari user berdasarkan email saja
-    const user = await prisma.user.findFirst({
+    const user = await dbService.user.findFirst({
       where: { email },
       select: { id: true, name: true, email: true, password: true, role: true }
-    });
+    }) as { id: string; name: string; email: string; password: string; role: string } | null;
 
     // Timing attack prevention: always hash password even if user not found
     // Use dummy hash to maintain constant execution time

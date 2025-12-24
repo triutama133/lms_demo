@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../../utils/auth';
-import { prisma } from "@/app/utils/supabaseClient";
+import { dbService } from '../../../../utils/database';
 
 export async function PATCH(req: NextRequest) {
   let auth;
@@ -27,7 +27,7 @@ export async function PATCH(req: NextRequest) {
 
     // Update order for each material
     for (const item of order) {
-      await prisma.material.update({
+      await dbService.material.update({
         where: { id: item.id },
         data: { order: item.order }
       });

@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../../utils/auth';
-import { prisma } from "@/app/utils/supabaseClient";
+import { dbService } from '../../../../utils/database';
 
 async function ensureTeacherOwnsCourse(teacherId: string, courseId: string): Promise<boolean> {
   try {
-    const course = await prisma.course.findUnique({
+    const course = await dbService.course.findUnique({
       where: { id: courseId },
       select: { teacherId: true }
-    });
+    }) as { teacherId: string } | null;
     if (!course) return false;
     return course.teacherId === teacherId;
   } catch {
@@ -38,19 +38,19 @@ export async function POST(request: Request) {
       }
     }
     // category must exist (created by admin)
-    const cat = await prisma.category.findUnique({
+    const cat = await dbService.category.findUnique({
       where: { id: category_id },
       select: { id: true, name: true }
-    });
+    }) as { id: string; name: string } | null;
     if (!cat) {
       return NextResponse.json({ success: false, error: 'Kategori tidak ditemukan.' }, { status: 404 });
     }
 
     // Update categories array in courses table
-    const currentCourse = await prisma.course.findUnique({
+    const currentCourse = await dbService.course.findUnique({
       where: { id: course_id },
       select: { categories: true }
-    });
+    }) as { categories: string[] } | null;
 
     if (!currentCourse) {
       return NextResponse.json({ success: false, error: 'Course tidak ditemukan.' }, { status: 404 });
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     const currentCategories = currentCourse.categories || [];
     if (!currentCategories.includes(category_id)) {
       const updatedCategories = [...currentCategories, category_id];
-      await prisma.course.update({
+      await dbService.course.update({
         where: { id: course_id },
         data: { categories: updatedCategories }
       });
@@ -94,10 +94,10 @@ export async function GET(request: Request) {
       if (rawIds.length === 0) {
         return NextResponse.json({ success: false, error: 'course_ids wajib.' }, { status: 400 });
       }
-      const courses = await prisma.course.findMany({
+      const courses = await dbService.course.findMany({
         where: { id: { in: rawIds } },
         select: { id: true, categories: true }
-      });
+      }) as { id: string; categories: string[] | null }[];
       const assignments: Record<string, string[]> = {};
       rawIds.forEach((id) => {
         assignments[id] = [];
@@ -119,16 +119,16 @@ export async function GET(request: Request) {
         return authErrorResponse(new Error('Forbidden'));
       }
     }
-    const cats = await prisma.category.findMany({
+    const cats = await dbService.category.findMany({
       select: { id: true, name: true },
       orderBy: { name: 'asc' }
-    });
+    }) as { id: string; name: string }[];
 
     // Get assigned categories from courses table
-    const courseData = await prisma.course.findUnique({
+    const courseData = await dbService.course.findUnique({
       where: { id: course_id },
       select: { categories: true }
-    });
+    }) as { categories: string[] | null } | null;
 
     if (!courseData) {
       return NextResponse.json({ success: false, error: 'Course tidak ditemukan.' }, { status: 404 });
@@ -167,19 +167,19 @@ export async function DELETE(request: Request) {
     }
 
     // category must exist (created by admin)
-    const cat = await prisma.category.findUnique({
+    const cat = await dbService.category.findUnique({
       where: { id: category_id },
       select: { id: true, name: true }
-    });
+    }) as { id: string; name: string } | null;
     if (!cat) {
       return NextResponse.json({ success: false, error: 'Kategori tidak ditemukan.' }, { status: 404 });
     }
 
     // Update categories array in courses table
-    const currentCourse = await prisma.course.findUnique({
+    const currentCourse = await dbService.course.findUnique({
       where: { id: course_id },
       select: { categories: true }
-    });
+    }) as { categories: string[] | null } | null;
 
     if (!currentCourse) {
       return NextResponse.json({ success: false, error: 'Course tidak ditemukan.' }, { status: 404 });
@@ -188,7 +188,7 @@ export async function DELETE(request: Request) {
     const currentCategories = currentCourse.categories || [];
     const updatedCategories = currentCategories.filter((id: string) => id !== category_id);
 
-    await prisma.course.update({
+    await dbService.course.update({
       where: { id: course_id },
       data: { categories: updatedCategories }
     });
@@ -229,17 +229,17 @@ export async function PUT(request: Request) {
 
     // Validate all category_ids exist (if not empty)
     if (category_ids.length > 0) {
-      const cats = await prisma.category.findMany({
+      const cats = await dbService.category.findMany({
         where: { id: { in: category_ids } },
         select: { id: true }
-      });
+      }) as { id: string }[];
       if (cats.length !== category_ids.length) {
         return NextResponse.json({ success: false, error: 'Beberapa kategori tidak ditemukan.' }, { status: 404 });
       }
     }
 
     // Update categories array in courses table
-    await prisma.course.update({
+    await dbService.course.update({
       where: { id: course_id },
       data: { categories: category_ids }
     });

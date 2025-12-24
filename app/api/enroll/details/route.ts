@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { authErrorResponse, refreshAuthCookie, requireAuth } from '../../../utils/auth';
-import { prisma } from "@/app/utils/supabaseClient";
+import { dbService } from '../../../../utils/database';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -32,7 +32,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const enrollment = await prisma.enrollment.findFirst({
+    const enrollment = await dbService.enrollment.findFirst({
       where: {
         userId: user_id,
         courseId: course_id
@@ -41,7 +41,7 @@ export async function GET(req: Request) {
         id: true,
         enrolledAt: true
       }
-    });
+    }) as { id: string; enrolledAt: Date } | null;
 
     if (!enrollment) {
       return finalize({ success: false, error: 'Enrollment tidak ditemukan.' });

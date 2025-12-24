@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import parse, { domToReact, DOMNode, Element } from 'html-react-parser';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import VideoEmbed, { canAutoEmbed } from '../../../../../../components/VideoEmbed';
 import StudentHeader from '../../../../../../components/StudentHeader';
@@ -43,8 +44,6 @@ export default function MaterialView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [openSection, setOpenSection] = useState<number | null>(null);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [loadingPdf, setLoadingPdf] = useState(false);
 
   useEffect(() => {
     if (!materialId) return;
@@ -71,29 +70,6 @@ export default function MaterialView() {
         setLoading(false);
       });
   }, [materialId]);
-
-  const getPresignedUrl = async (fileUrl: string) => {
-    setLoadingPdf(true);
-    try {
-      const response = await fetch(`/api/materials/presigned?url=${encodeURIComponent(fileUrl)}`);
-      const data = await response.json();
-      if (data.success) {
-        setPdfUrl(data.url);
-      } else {
-        console.error('Failed to get presigned URL:', data.error);
-      }
-    } catch (error) {
-      console.error('Error getting presigned URL:', error);
-    } finally {
-      setLoadingPdf(false);
-    }
-  };
-
-  useEffect(() => {
-    if (material?.type === 'pdf' && material.pdf_url && !pdfUrl) {
-      getPresignedUrl(material.pdf_url);
-    }
-  }, [material, pdfUrl]);
 
   useEffect(() => {
     if (!materialId) return;
@@ -186,14 +162,14 @@ export default function MaterialView() {
         <div className="mb-4 text-gray-700 text-center">{material.description}</div>
         {material.type === 'pdf' ? (
           <div className="text-center">
-            {pdfUrl ? (
+            {material.pdf_url ? (
               <>
-                <a href={pdfUrl} target="_blank" rel="noopener" className="text-blue-700 underline font-semibold">Download PDF</a>
-                <iframe src={pdfUrl} className="w-full h-96 mt-4 border rounded" />
+                <Link href={`/api/materials/presigned?url=${encodeURIComponent(material.pdf_url)}&stream=1`} target="_blank" rel="noopener noreferrer" className="text-blue-700 underline font-semibold">Download PDF</Link>
+                <iframe src={`/api/materials/presigned?url=${encodeURIComponent(material.pdf_url)}&stream=1`} className="w-full h-96 mt-4 border rounded" />
               </>
             ) : (
               <div className="text-gray-500">
-                {loadingPdf ? 'Memuat PDF...' : 'Gagal memuat PDF'}
+                PDF tidak tersedia
               </div>
             )}
           </div>

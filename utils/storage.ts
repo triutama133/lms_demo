@@ -141,7 +141,7 @@ class SupabaseStorage implements StorageService {
 
   async uploadFile(file: Buffer, fileName: string, contentType: string): Promise<UploadResult> {
     try {
-      const { data, error } = await this.supabase.storage
+      const { error } = await this.supabase.storage
         .from(this.bucketName)
         .upload(fileName, file, {
           contentType,

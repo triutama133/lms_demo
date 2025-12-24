@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../utils/auth';
 import { storageService } from '../../../utils/storage';
-import { prisma } from "@/app/utils/supabaseClient";
+import { dbService } from '../../../utils/database';
 
 async function requireTeacherOrAdmin() {
   const auth = await requireAuth();
@@ -30,10 +30,10 @@ export async function DELETE(req: NextRequest) {
     if (!id) {
       return finalize({ success: false, error: 'ID materi wajib diisi.' }, { status: 400 });
     }
-    const material = await prisma.material.findUnique({
+    const material = await dbService.material.findUnique({
       where: { id },
       select: { type: true, pdfUrl: true }
-    });
+    }) as { type: string; pdfUrl: string | null } | null;
     if (!material) {
       return finalize({ success: false, error: 'Materi tidak ditemukan.' }, { status: 404 });
     }
@@ -48,7 +48,7 @@ export async function DELETE(req: NextRequest) {
         // Intentionally swallow errors when deleting remote file
       }
     }
-    await prisma.material.delete({ where: { id } });
+    await dbService.material.delete({ where: { id } });
     return finalize({ success: true });
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Database error';
@@ -105,12 +105,12 @@ export async function PUT(req: NextRequest) {
 
       updateData.pdfUrl = uploadResult.url;
     }
-    const material = await prisma.material.update({
+    const material = await dbService.material.update({
       where: { id },
       data: updateData
     });
     if (Array.isArray(sections)) {
-      await prisma.materialSection.deleteMany({ where: { materialId: id } });
+      await dbService.materialSection.deleteMany({ where: { materialId: id } });
       if (sections.length > 0) {
         const sectionRows = sections.map((section, idx) => ({
           materialId: id,
@@ -118,7 +118,7 @@ export async function PUT(req: NextRequest) {
           content: section.content,
           order: idx + 1,
         }));
-        await prisma.materialSection.createMany({ data: sectionRows });
+        await dbService.materialSection.createMany({ data: sectionRows });
       }
     }
     return finalize({ success: true, material });
@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
       }
 
       const pdfUrl = uploadResult.url;
-      const material = await prisma.material.create({
+      const material = await dbService.material.create({
         data: {
           title,
           description,
@@ -173,18 +173,18 @@ export async function POST(req: NextRequest) {
           type,
           pdfUrl,
         }
-      });
+      }) as { id: string };
       return finalize({ success: true, pdfUrl: pdfUrl ? storageService.replaceWithPublicUrl(pdfUrl) : null, material });
     }
 
-    const material = await prisma.material.create({
+    const material = await dbService.material.create({
       data: {
         title,
         description,
         courseId: course_id,
         type,
       }
-    });
+    }) as { id: string };
     type Section = { title: string; content: string; order: number };
     let sectionsArr: Section[] = [];
     if (typeof sections === 'string') {
@@ -203,10 +203,14 @@ export async function POST(req: NextRequest) {
         content: section.content,
         order: idx + 1,
       }));
-      await prisma.materialSection.createMany({ data: sectionRows });
+      await dbService.materialSection.createMany({ data: sectionRows });
     }
     return finalize({ success: true, material });
   } catch (err: unknown) {
+    console.error('Error creating material:', err);
+    console.error('Error stack:', (err as Error)?.stack);
+    console.error('Error name:', (err as Error)?.name);
+    console.error('Error message:', (err as Error)?.message);
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
     return finalize({ error: errorMsg }, { status: 500 });
   }

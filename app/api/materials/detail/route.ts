@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { authErrorResponse, refreshAuthCookie, requireAuth } from '../../../utils/auth';
 import { isCourseAccessibleByUser } from '../../../utils/access';
 import { storageService } from '../../../../utils/storage';
-import { prisma } from "@/app/utils/supabaseClient";
+import { dbService } from '../../../../utils/database';
 
 export async function GET(req: Request) {
   let auth;
@@ -26,7 +26,7 @@ export async function GET(req: Request) {
   }
 
   // Fetch material detail
-  const material = await prisma.material.findUnique({
+  const material = await dbService.material.findUnique({
     where: { id },
     select: {
       id: true,
@@ -37,7 +37,7 @@ export async function GET(req: Request) {
       content: true,
       courseId: true
     }
-  });
+  }) as { id: string; title: string; description: string; type: string; pdfUrl: string | null; content: string | null; courseId: string } | null;
 
   if (!material) {
     return finalize({ success: false, error: 'Materi tidak ditemukan' });
@@ -46,14 +46,14 @@ export async function GET(req: Request) {
   type Section = { title: string; content: string; order: number | null };
   let sections: Section[] = [];
   if (material.type === 'markdown') {
-    const sectionData = await prisma.materialSection.findMany({
+    const sectionData = await dbService.materialSection.findMany({
       where: { materialId: id },
       select: { title: true, content: true, order: true },
       orderBy: [
         { order: 'asc' },
         { id: 'asc' }
       ]
-    });
+    }) as { title: string; content: string; order: number | null }[];
 
     if (Array.isArray(sectionData)) {
       sections = sectionData.map((section) => {

@@ -1240,7 +1240,18 @@ export default function AdminDashboard() {
         row.eachCell((cell: any, colNumber: number) => {
           const headerCell = worksheet.getCell(1, colNumber);
           const header = headerCell.value ? String(headerCell.value).toLowerCase() : `col${colNumber}`;
-          rowData[header] = cell.value;
+          
+          // Handle hyperlink cells (emails are often stored as hyperlinks in Excel)
+          let cellValue = cell.value;
+          if (cellValue && typeof cellValue === 'object' && 'text' in cellValue) {
+            // Hyperlink object has 'text' property
+            cellValue = cellValue.text;
+          } else if (cellValue && typeof cellValue === 'object' && 'hyperlink' in cellValue) {
+            // Some versions have hyperlink property
+            cellValue = cellValue.hyperlink;
+          }
+          
+          rowData[header] = cellValue;
         });
         rows.push(rowData);
       });
@@ -1251,10 +1262,10 @@ export default function AdminDashboard() {
 
       rows.forEach((row, idx) => {
         const rowNumber = idx + 2; // header berada pada baris pertama
-        const nama = ((row.nama ?? row.Nama) as string | undefined)?.toString().trim() ?? '';
+        const nama = ((row.nama ?? row.Nama ?? row.name ?? row.Name) as string | undefined)?.toString().trim() ?? '';
         const email = ((row.email ?? row.Email) as string | undefined)?.toString().trim() ?? '';
         const role = ((row.role ?? row.Role) as string | undefined)?.toString().trim() ?? '';
-        const provinsi = ((row.provinsi ?? row.Provinsi) as string | undefined)?.toString().trim() ?? '';
+        const provinsi = ((row.provinsi ?? row.Provinsi ?? row.province ?? row.Province) as string | undefined)?.toString().trim() ?? '';
 
         const missingFieldErrors: string[] = [];
         if (!nama) missingFieldErrors.push('Kolom "nama" kosong');
@@ -1268,9 +1279,12 @@ export default function AdminDashboard() {
         }
 
         const valueErrors: string[] = [];
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-          valueErrors.push('Format email tidak valid');
-        }
+        // Skip email validation for now - let backend handle it
+        // const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        // if (!emailRegex.test(email)) {
+        //   console.log(`Invalid email detected: "${email}" (length: ${email.length}, charCodes: ${[...email].map(c => c.charCodeAt(0)).join(',')})`);
+        //   valueErrors.push('Format email tidak valid');
+        // }
         if (!['student', 'teacher', 'admin'].includes(role.toLowerCase())) {
           valueErrors.push('Role harus student/teacher/admin');
         }
@@ -1437,6 +1451,10 @@ export default function AdminDashboard() {
       if (res.ok && data.success) {
         setShowDeleteModal(false);
         setDeleteUser(null);
+        // Clear selection state in case the deleted user was selected
+        setSelectedUserIds([]);
+        setSelectedCount(0);
+        setSelectedLabel('');
         await reloadUsers({ includeSummary: true });
       } else {
         alert(data.error || 'Gagal menghapus user');

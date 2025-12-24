@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { authErrorResponse, refreshAuthCookie, requireAuth } from '../../utils/auth';
-import { prisma } from "@/app/utils/supabaseClient";
+import { dbService } from '../../../utils/database';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -25,7 +25,7 @@ export async function GET(req: Request) {
   };
 
   // Check if user is enrolled in the course
-  const enrollment = await prisma.enrollment.findFirst({
+  const enrollment = await dbService.enrollment.findFirst({
     where: {
       userId: user_id,
       courseId: course_id
@@ -41,7 +41,7 @@ export async function GET(req: Request) {
   }
 
   // Get all progress for user and course
-  const progress = await prisma.progress.findMany({
+  const progress = await dbService.progress.findMany({
     where: {
       userId: user_id,
       courseId: course_id

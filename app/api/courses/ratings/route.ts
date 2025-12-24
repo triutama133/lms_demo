@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { authErrorResponse, refreshAuthCookie, requireAuth } from '../../../utils/auth';
-import { prisma } from "@/app/utils/supabaseClient";
+import { dbService } from '../../../../utils/database';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -11,16 +11,27 @@ export async function GET(req: Request) {
   }
 
   try {
-    // Get all ratings for this course with user info
-    const ratings = await prisma.courseRating.findMany({
+    // Get all ratings for this course
+    const ratings = await dbService.courseRating.findMany({
       where: { courseId: course_id },
-      include: {
-        user: {
-          select: { id: true, name: true }
-        }
-      },
+      select: { id: true, rating: true, review: true, createdAt: true, updatedAt: true, userId: true },
       orderBy: { createdAt: 'desc' }
-    });
+    }) as { id: string; rating: number; review: string | null; createdAt: Date; updatedAt: Date; userId: string }[];
+
+    // Get user info for each rating
+    const userIds = [...new Set(ratings.map(r => r.userId))];
+    const users = await dbService.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, name: true }
+    }) as { id: string; name: string | null }[];
+
+    const userMap = new Map(users.map(u => [u.id, u]));
+
+    // Combine ratings with user info
+    const ratingsWithUsers = ratings.map(r => ({
+      ...r,
+      user: userMap.get(r.userId) || { id: r.userId, name: null }
+    }));
 
     // Calculate statistics
     const totalRatings = ratings.length;
@@ -36,7 +47,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       success: true,
-      ratings: ratings.map(r => ({
+      ratings: ratingsWithUsers.map(r => ({
         id: r.id,
         rating: r.rating,
         review: r.review,
@@ -85,28 +96,28 @@ export async function POST(req: Request) {
 
   try {
     // Check if user is enrolled in the course
-    const enrollment = await prisma.enrollment.findFirst({
+    const enrollment = await dbService.enrollment.findFirst({
       where: {
         userId: payload.sub,
         courseId: course_id
       }
-    });
+    }) as { id: string } | null;
 
     if (!enrollment) {
       return finalize({ success: false, error: 'Anda harus mengikuti course ini untuk memberikan rating.' }, { status: 403 });
     }
 
     // Check if user already rated this course
-    const existingRating = await prisma.courseRating.findFirst({
+    const existingRating = await dbService.courseRating.findFirst({
       where: {
         userId: payload.sub,
         courseId: course_id
       }
-    });
+    }) as { id: string; rating: number; review: string | null } | null;
 
     if (existingRating) {
       // Update existing rating
-      await prisma.courseRating.update({
+      await dbService.courseRating.update({
         where: { id: existingRating.id },
         data: {
           rating,
@@ -118,7 +129,7 @@ export async function POST(req: Request) {
       return finalize({ success: true, message: 'Rating berhasil diupdate.' });
     } else {
       // Create new rating
-      await prisma.courseRating.create({
+      await dbService.courseRating.create({
         data: {
           userId: payload.sub,
           courseId: course_id,

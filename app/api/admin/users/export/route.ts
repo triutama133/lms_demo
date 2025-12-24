@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../../../utils/auth';
-import { prisma } from "@/app/utils/supabaseClient";
+import { dbService } from '../../../../../utils/database';
 import ExcelJS from 'exceljs';
 
 export async function GET(request: Request) {
@@ -37,25 +37,25 @@ export async function GET(request: Request) {
     }
 
     // Get user data
-    const users = await prisma.user.findMany({
+    const users = await dbService.user.findMany({
       where: { id: { in: userIds } },
       select: { id: true, name: true, email: true, role: true, provinsi: true }
-    });
+    }) as { id: string; name: string; email: string; role: string; provinsi: string | null }[];
 
     let exportData = users;
 
     // Include categories if requested
     if (includeCategories) {
       // Get all categories
-      const categories = await prisma.category.findMany({
+      const categories = await dbService.category.findMany({
         select: { id: true, name: true }
-      });
+      }) as { id: string; name: string }[];
 
       // Get user-category assignments
-      const assignments = await prisma.userCategory.findMany({
+      const assignments = await dbService.userCategory.findMany({
         where: { userId: { in: userIds } },
         select: { userId: true, categoryId: true }
-      });
+      }) as { userId: string; categoryId: string }[];
 
       const categoryMap = new Map(categories.map((cat: { id: string; name: string }) => [cat.id, cat.name]));
 

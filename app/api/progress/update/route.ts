@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { authErrorResponse, refreshAuthCookie, requireAuth } from '../../../utils/auth';
-import { prisma } from "@/app/utils/supabaseClient";
+import { dbService } from '../../../../utils/database';
 
 export async function POST(req: Request) {
   const body = await req.json();
@@ -28,17 +28,17 @@ export async function POST(req: Request) {
 
   try {
     // Get material to find courseId
-    const material = await prisma.material.findUnique({
+    const material = await dbService.material.findUnique({
       where: { id: material_id },
       select: { courseId: true }
-    });
+    }) as { courseId: string } | null;
 
     if (!material || !material.courseId) {
       return finalize({ success: false, error: 'Material tidak ditemukan atau tidak memiliki course' });
     }
 
     // Upsert progress
-    await prisma.progress.upsert({
+    await dbService.progress.upsert({
       where: {
         userId_courseId_materialId: {
           userId: user_id,

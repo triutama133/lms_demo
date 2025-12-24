@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../utils/auth';
-import { prisma } from "@/app/utils/supabaseClient";
+import { dbService } from '../../../utils/database';
 
 export async function GET() {
   let auth;
@@ -13,7 +13,7 @@ export async function GET() {
   }
   const { payload, shouldRefresh } = auth;
   try {
-    const categories = await prisma.category.findMany({
+    const categories = await dbService.category.findMany({
       select: { id: true, name: true, description: true, createdAt: true },
       orderBy: { name: 'asc' }
     });

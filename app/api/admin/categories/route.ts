@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../../utils/auth';
-import { prisma } from "@/app/utils/supabaseClient";
+import { dbService } from '../../../../utils/database';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function GET() {
@@ -13,10 +13,10 @@ export async function GET() {
   }
   const { payload, shouldRefresh } = auth;
   try {
-    const categories = await prisma.category.findMany({
+    const categories = await dbService.category.findMany({
       select: { id: true, name: true, description: true, createdAt: true },
       orderBy: { name: 'asc' }
-    });
+    }) as { id: string; name: string; description: string | null; createdAt: Date }[];
     const response = NextResponse.json({ success: true, categories });
     if (shouldRefresh) await refreshAuthCookie(response, payload);
     return response;
@@ -45,9 +45,9 @@ export async function POST(request: Request) {
   const categoryId = uuidv4();
 
   try {
-    const category = await prisma.category.create({
+    const category = await dbService.category.create({
       data: { id: categoryId, name, description }
-    });
+    }) as { id: string; name: string; description: string | null };
     const response = NextResponse.json({ success: true, category }, { status: 200 });
     if (shouldRefresh) await refreshAuthCookie(response, payload);
     return response;
@@ -72,10 +72,10 @@ export async function PUT(request: Request) {
     return NextResponse.json({ success: false, error: 'id dan name wajib.' }, { status: 400 });
   }
   try {
-    const category = await prisma.category.update({
+    const category = await dbService.category.update({
       where: { id },
       data: { name, description }
-    });
+    }) as { id: string; name: string; description: string | null };
     const response = NextResponse.json({ success: true, category }, { status: 200 });
     if (shouldRefresh) await refreshAuthCookie(response, payload);
     return response;
@@ -100,7 +100,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ success: false, error: 'id wajib.' }, { status: 400 });
   }
   try {
-    await prisma.category.delete({ where: { id } });
+    await dbService.category.delete({ where: { id } });
     const response = NextResponse.json({ success: true }, { status: 200 });
     if (shouldRefresh) await refreshAuthCookie(response, payload);
     return response;

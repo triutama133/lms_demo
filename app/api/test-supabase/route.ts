@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from "@/app/utils/supabaseClient";
+import { dbService } from "@/utils/database";
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../utils/auth';
 
 export async function GET() {
@@ -12,15 +12,15 @@ export async function GET() {
   }
   const { payload, shouldRefresh } = auth;
   try {
-    const data = await prisma.user.findMany({ take: 1 });
-    const response = NextResponse.json({ success: true, data });
+    const data = await dbService.user.findMany({ take: 1, select: { id: true, email: true, role: true } });
+    const response = NextResponse.json({ success: true, data, databaseType: process.env.DATABASE_TYPE || 'prisma' });
     if (shouldRefresh) {
       await refreshAuthCookie(response, payload);
     }
     return response;
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Database error';
-    const response = NextResponse.json({ success: false, error: errorMsg });
+    const response = NextResponse.json({ success: false, error: errorMsg, databaseType: process.env.DATABASE_TYPE || 'prisma' });
     if (shouldRefresh) {
       await refreshAuthCookie(response, payload);
     }

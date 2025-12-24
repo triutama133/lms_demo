@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import { prisma } from "@/app/utils/supabaseClient";
 import { v4 as uuidv4 } from 'uuid';
 import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../../../utils/auth';
+import { dbService } from '../../../../../utils/database';
 import ExcelJS from 'exceljs';
 
 export async function POST(req: Request) {
@@ -159,10 +159,10 @@ export async function POST(req: Request) {
       const rawPassword = u.password && u.password.trim() ? u.password : 'ilmi123';
 
       // Cek email duplikat
-      const existing = await prisma.user.findFirst({
+      const existing = await dbService.user.findFirst({
         where: { email: u.email },
         select: { id: true }
-      });
+      }) as { id: string } | null;
 
       if (existing) {
         failed.push({ idx: idx+1, errors: [`Email ${u.email} sudah terdaftar`], user: u });
@@ -181,7 +181,7 @@ export async function POST(req: Request) {
       };
 
       try {
-        await prisma.user.create({
+        await dbService.user.create({
           data: user
         });
       } catch (error) {

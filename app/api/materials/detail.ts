@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authErrorResponse, ensureRole, refreshAuthCookie, requireAuth } from '../../utils/auth';
-import { prisma } from "@/app/utils/supabaseClient";
+import { authErrorResponse, refreshAuthCookie, requireAuth } from '../../utils/auth';
+import { dbService } from '../../../utils/database';
 import { isCourseAccessibleByUser } from '../../utils/access';
 
 type MaterialWithSections = {
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
   }
   try {
     // Ambil data materi
-    const material = await prisma.material.findUnique({
+    const material = await dbService.material.findUnique({
       where: { id: material_id }
     }) as MaterialWithSections;
     if (!material) {
@@ -47,14 +47,14 @@ export async function GET(req: NextRequest) {
     // Jika tipe markdown, ambil sections dari table material_sections
     if (material.type === 'markdown') {
       // Urutkan berdasarkan 'order' jika ada, fallback ke 'id'
-      const sections = await prisma.materialSection.findMany({
+      const sections = await dbService.materialSection.findMany({
         where: { materialId: material_id },
         select: { title: true, content: true, order: true },
         orderBy: [
           { order: 'asc' },
           { id: 'asc' }
         ]
-      });
+      }) as { title: string; content: string; order: number | null }[];
       material.sections = sections;
     } else {
       material.sections = [];

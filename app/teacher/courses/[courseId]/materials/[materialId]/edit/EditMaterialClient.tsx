@@ -41,8 +41,6 @@ export default function EditMaterialClient({ courseId, materialId }: EditMateria
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [loadingPdf, setLoadingPdf] = useState(false);
 
   useEffect(() => {
     if (!materialId) {
@@ -79,29 +77,6 @@ export default function EditMaterialClient({ courseId, materialId }: EditMateria
         setLoading(false);
       });
   }, [materialId]);
-
-  const getPresignedUrl = async (fileUrl: string) => {
-    setLoadingPdf(true);
-    try {
-      const response = await fetch(`/api/materials/presigned?url=${encodeURIComponent(fileUrl)}`);
-      const data = await response.json();
-      if (data.success) {
-        setPdfUrl(data.url);
-      } else {
-        console.error('Failed to get presigned URL:', data.error);
-      }
-    } catch (error) {
-      console.error('Error getting presigned URL:', error);
-    } finally {
-      setLoadingPdf(false);
-    }
-  };
-
-  useEffect(() => {
-    if (material?.type === 'pdf' && material.pdf_url && !pdfUrl) {
-      getPresignedUrl(material.pdf_url);
-    }
-  }, [material, pdfUrl]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -200,9 +175,9 @@ export default function EditMaterialClient({ courseId, materialId }: EditMateria
           {material?.type === "pdf" && (
             <div>
               <label className="mb-1 block font-semibold">File PDF Saat Ini</label>
-              {pdfUrl ? (
+              {material?.pdf_url ? (
                 <a
-                  href={pdfUrl}
+                  href={`/api/materials/presigned?url=${encodeURIComponent(material.pdf_url)}&stream=1`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-semibold text-blue-700 underline"
@@ -211,7 +186,7 @@ export default function EditMaterialClient({ courseId, materialId }: EditMateria
                 </a>
               ) : (
                 <span className="text-gray-500">
-                  {loadingPdf ? 'Memuat PDF...' : 'Tidak ada file PDF'}
+                  Tidak ada file PDF
                 </span>
               )}
               <label className="mb-1 mt-4 block font-semibold">Ganti PDF (opsional)</label>
