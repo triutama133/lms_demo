@@ -178,6 +178,7 @@ export async function POST(req: Request) {
         role: u.role,
         provinsi: u.provinsi || '',
         password: hashed,
+        tenantId: process.env.TENANT_ID || 'lms_1'
       };
 
       try {

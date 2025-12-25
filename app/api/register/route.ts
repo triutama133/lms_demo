@@ -84,9 +84,10 @@ export async function POST(request: Request) {
         email: normalizedEmail, 
         password: hashedPassword, 
         role: 'student', 
-        provinsi: sanitizedProvinsi 
+        provinsi: sanitizedProvinsi,
+        tenantId: process.env.TENANT_ID || 'lms_1'
       }
-    }) as { id: string; name: string; email: string; role: string; provinsi: string | null };
+    }) as { id: string; name: string; email: string; role: string; provinsi: string | null; tenantId: string };
 
     // Remove password from response
     const userWithoutPassword = { id: user.id, name: user.name, email: user.email, role: user.role, provinsi: user.provinsi };

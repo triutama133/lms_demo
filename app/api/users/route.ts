@@ -229,6 +229,7 @@ export async function POST(request: Request) {
       role,
       provinsi: provinsi || '',
       password: hashed,
+      tenantId: process.env.TENANT_ID || 'lms_1'
       // categories: [], // Remove to use default
     };
 

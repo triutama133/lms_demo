@@ -18,6 +18,7 @@ model User {
   role      String
   provinsi  String?
   password  String
+  tenantId  String   @map("tenant_id")
   categories String[]
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
